@@ -266,7 +266,9 @@ _encode() {
     fi
     local string="$1"
     local new_string=""
-    local LC_COLLATE=C
+    # LC_ALL=C makes substring extraction operate on bytes, so multi-byte
+    # characters are encoded one byte at a time (matching percent-encoding).
+    local LC_ALL=C
 
     if [[ -z "${string}" ]]; then
         echo ""
@@ -278,7 +280,7 @@ _encode() {
     fi
 
     local _string_len=${#string}
-    local i
+    local i __hex
     for (( i = 0; i<${_string_len}; i++ )); do
         local __char="${string:$i:1}"
         case $__char in
@@ -286,12 +288,15 @@ _encode() {
                 new_string+="$__char"
                 ;;
             *)
-                hex="$(echo -n "$__char" | $HEXDUMP_PATH -e '1 1 "!%02x"')"
-                new_string+="${hex//!/%}"
+                # printf's "'c" form yields the numeric value of the character.
+                # bash 3.2 sign-extends bytes >= 0x80 (e.g. 0xff becomes
+                # ffffffffffffffff), so keep only the low byte.
+                printf -v __hex '%02x' "'$__char"
+                new_string+="%${__hex: -2}"
                 ;;
         esac
     done
-    unset i _string_len
+    unset i __hex _string_len
 
     printf "%s" "${new_string}"
 
