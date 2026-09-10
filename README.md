@@ -36,12 +36,8 @@ possible byte values and for real environment-file values, verified under
 bash 5.3, bash 3.2 (the version macOS ships), zsh with `KSH_ARRAYS`, and under a
 UTF-8 locale. `hexdump` is no longer a runtime dependency.
 
-**Still slow, not yet addressed:** `cd()` costs roughly 100ms per call because it
-re-parses the default environment every time; `scripts/function/functions` sources
-16 files separately; and the whole `_bash_pseudo_hash` module — a pre-bash-4.0
-associative-array emulation that percent-encodes values into a space-separated
-string and forks a subshell on every read and write — is the underlying design
-problem.
+Remaining performance work is tracked in
+[issues](https://github.com/cmingou/gvm/issues).
 
 Features
 ========
