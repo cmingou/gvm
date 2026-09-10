@@ -1,12 +1,13 @@
 # gvm
 
-[![Build Status](https://travis-ci.org/moovweb/gvm.svg?branch=master)](https://travis-ci.org/moovweb/gvm)
+A fork of [moovweb/gvm](https://github.com/moovweb/gvm), maintained at
+[cmingou/gvm](https://github.com/cmingou/gvm) because the original project is no
+longer actively maintained. This fork does not aim for upstream compatibility
+and will not send changes back; it focuses on shell startup performance.
 
-By Josh Bussdieker (jbuss, jaja, jbussdieker) while working at [Moovweb](https://www.moovweb.com)
-
-Currently lovingly maintained by [Benjamin Knigge](https://github.com/BenKnigge)
-
-Pull requests and other any other contributions would be very much appreciated.
+Originally written by Josh Bussdieker (jbuss, jaja, jbussdieker) while working at
+[Moovweb](https://www.moovweb.com), and later maintained by
+[Benjamin Knigge](https://github.com/BenKnigge).
 
 GVM provides an interface to manage Go versions.
 
@@ -39,7 +40,7 @@ To install:
 1.  Install gvm:
 
     ```
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/cmingou/gvm/master/binscripts/gvm-installer)
     ```
 
 Or if you are using zsh just change `bash` with `zsh`
