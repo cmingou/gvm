@@ -1,15 +1,47 @@
 # gvm
 
-A fork of [moovweb/gvm](https://github.com/moovweb/gvm), maintained at
-[cmingou/gvm](https://github.com/cmingou/gvm) because the original project is no
-longer actively maintained. This fork does not aim for upstream compatibility
-and will not send changes back; it focuses on shell startup performance.
-
-Originally written by Josh Bussdieker (jbuss, jaja, jbussdieker) while working at
-[Moovweb](https://www.moovweb.com), and later maintained by
-[Benjamin Knigge](https://github.com/BenKnigge).
-
 GVM provides an interface to manage Go versions.
+
+> **This is a fork.** The upstream project, [moovweb/gvm](https://github.com/moovweb/gvm),
+> is no longer actively maintained, and its shell integration had become slow
+> enough to be noticeable on every shell startup and every `cd`. This fork exists
+> to fix that. It is maintained at [cmingou/gvm](https://github.com/cmingou/gvm).
+>
+> Upstream compatibility is **not** a goal and changes here are not submitted back.
+> If you want the original, use [moovweb/gvm](https://github.com/moovweb/gvm).
+>
+> gvm is MIT licensed and remains so; see [License and attribution](#license-and-attribution).
+
+What's different in this fork
+=============================
+
+**Shell startup no longer forks a process per character.** `_encode()` in
+`scripts/function/_bash_pseudo_hash` spawned one `hexdump` subprocess for every
+character outside `[A-Za-z0-9.~_-]`. Because gvm stores `GOROOT`, `GOPATH`,
+`PATH`, `LD_LIBRARY_PATH` and friends as percent-encoded values, a typical
+`environments/default` triggers around 76 forks — on every login, and again on
+every `cd`, since gvm overrides `cd()` and re-resolves the default environment
+each time. The encoding is now done with the shell's own `printf` builtin.
+
+Measured on macOS 26 / arm64 with 7 installed Go versions,
+`source $GVM_ROOT/scripts/gvm`:
+
+| | before | after |
+|---|---|---|
+| cold | ~1.05s | ~0.19s |
+| warm | ~0.6s | ~0.15s |
+
+Output is byte-for-byte identical to the previous implementation for all 255
+possible byte values and for real environment-file values, verified under
+bash 5.3, bash 3.2 (the version macOS ships), zsh with `KSH_ARRAYS`, and under a
+UTF-8 locale. `hexdump` is no longer a runtime dependency.
+
+**Still slow, not yet addressed:** `cd()` costs roughly 100ms per call because it
+re-parses the default environment every time; `scripts/function/functions` sources
+16 files separately; and the whole `_bash_pseudo_hash` module — a pre-bash-4.0
+associative-array emulation that percent-encodes values into a space-separated
+string and forks a subshell on every read and write — is the underlying design
+problem.
 
 Features
 ========
@@ -22,9 +54,12 @@ Features
 
 Background
 ==========
-When we started developing in Go mismatched dependencies and API changes plagued our build process and made it extremely difficult to merge with other peoples changes.
 
-After nuking my entire GOROOT several times and rebuilding I decided to come up with a tool to oversee the process. It eventually evolved into what gvm is today.
+From the original project, in Josh Bussdieker's words:
+
+> When we started developing in Go mismatched dependencies and API changes plagued our build process and made it extremely difficult to merge with other peoples changes.
+>
+> After nuking my entire GOROOT several times and rebuilding I decided to come up with a tool to oversee the process. It eventually evolved into what gvm is today.
 
 Installing
 ==========
@@ -45,6 +80,14 @@ To install:
 
 Or if you are using zsh just change `bash` with `zsh`
 
+The installer clones whatever `SRC_REPO` points at, defaulting to this fork. To
+install a different repository — upstream, or your own fork — override it:
+
+```
+SRC_REPO=https://github.com/moovweb/gvm.git \
+  bash < <(curl -s -S -L https://raw.githubusercontent.com/cmingou/gvm/master/binscripts/gvm-installer)
+```
+
 Installing Go
 =============
     gvm install go1.4
@@ -61,9 +104,9 @@ Additional options can be specified when installing Go:
         -B,  --binary             Only install from binary.
              --prefer-binary      Attempt a binary install, falling back to source.
         -h,  --help               Display this message.
-        
+
 ### A Note on Compiling Go 1.5+
-Go 1.5+ removed the C compilers from the toolchain and [replaced][compiler_note] them with one written in Go. Obviously, this creates a bootstrapping problem if you don't already have a working Go install. In order to compile Go 1.5+, make sure Go 1.4 is installed first. If Go 1.4 won't install try a later version (e.g. go1.5), just make sure you have the `-B` option after the version number. 
+Go 1.5+ removed the C compilers from the toolchain and [replaced][compiler_note] them with one written in Go. Obviously, this creates a bootstrapping problem if you don't already have a working Go install. In order to compile Go 1.5+, make sure Go 1.4 is installed first. If Go 1.4 won't install try a later version (e.g. go1.5), just make sure you have the `-B` option after the version number.
 
 ```
 gvm install go1.4 -B
@@ -204,8 +247,51 @@ Recipe for success:
 
 See examples/native for a working example.
 
+Hacking on gvm
+==============
+
+The installer clones this repository into `$GVM_ROOT` and then renames `.git` to
+`git.bak`, so an installed gvm is not a usable checkout. If you want to develop
+against a live install instead of reinstalling every time, keep `.git` in place
+and tell gvm not to complain about it:
+
+```
+mv "$GVM_ROOT/git.bak" "$GVM_ROOT/.git"
+```
+
+then, **before** the line that sources gvm in your shell profile:
+
+```
+export GVM_NO_GIT_BAK=1
+```
+
+Without `GVM_NO_GIT_BAK`, `scripts/env/gvm` refuses to run when `.git` is present
+and tells you to reinstall. With it, updating is just `git -C "$GVM_ROOT" pull`.
+
+Note that `binscripts/gvm-installer` deliberately refuses to run when `$GVM_ROOT`
+already exists and suggests `rm -rf` — that would take every installed Go version
+and package set with it. `gos/`, `pkgsets/`, `environments/` and `archive/` are
+gitignored, so pulling into an existing checkout is safe; reinstalling is not.
+
 Troubleshooting
 ===============
-Sometimes especially during upgrades the state of gvm's files can get mixed up. This is mostly true for upgrade from older version than 0.0.8. Changes are slowing down and a LTR is imminent. But for now `rm -rf ~/.gvm` will always remove gvm. Stay tuned!
+The state of gvm's files can get mixed up, especially when upgrading from
+versions older than 0.0.8. `rm -rf ~/.gvm` will always remove gvm — along with
+every Go version and package set it manages.
 
-[![Gitter](https://badges.gitter.im/GoVesionManager/community.svg)](https://gitter.im/GoVesionManager/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+License and attribution
+=======================
+
+gvm is released under the MIT license. The full text, including the copyright
+notice that must be retained in copies and derivative works, is in
+[LICENSE](LICENSE):
+
+> Copyright (C) 2012 Moov Corp.
+
+Originally written by Josh Bussdieker (jbuss, jaja, jbussdieker) while working at
+[Moovweb](https://www.moovweb.com), and subsequently maintained upstream by
+[Benjamin Knigge](https://github.com/BenKnigge). See [AUTHORS](AUTHORS) and
+[ChangeLog](ChangeLog).
+
+This fork keeps that license unchanged; modifications made here are offered under
+the same terms.
