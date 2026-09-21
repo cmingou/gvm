@@ -1,10 +1,48 @@
 #!/usr/bin/env bash
+
+# gvm_environment_sanitize()
+# /*!
+# @abstract Reconcile the GOROOT recorded in an environment file with the go
+#   binary that actually resolves on PATH
+# @discussion
+# When the go binary found on PATH does not live below the GOROOT that the
+#   environment file declares, the file is rewritten so that GOROOT points at
+#   the location the active go reports, and the file is sourced again.
+#
+# The file is only ever rewritten with a non-empty, changed GOROOT: writing an
+#   empty value corrupts the file and makes every later call fail with
+#   "sed: first RE may not be empty" (issue #23). The rewrite uses shell
+#   builtins instead of "sed -i", whose in-place syntax differs between GNU
+#   and BSD sed and leaves a stray "<name>-e" backup file behind on macOS.
+# @param name Name of the environment file below $GVM_ROOT/environments
+# @return Returns success (status 0) when nothing needed to change or the file
+#   was rewritten, or failure (status 1) if the file could not be written.
+# */
 function gvm_environment_sanitize() {
+	local env_file="$GVM_ROOT/environments/$1"
 	local ACTIVE_GO="$(command -v go)"
-	if [[ "${ACTIVE_GO/${GOROOT}}" != "/bin/go" ]]; then
-		OLD_GOROOT="$GOROOT" && unset GOROOT
-		GOROOT="$(go env GOROOT)"
-		$SED_PATH -i'' -e 's|'${OLD_GOROOT}'|'${GOROOT}'|g' "$GVM_ROOT/environments/$1"
-		. "$GVM_ROOT/environments/$1" &> /dev/null
-	fi
+	local OLD_GOROOT="$GOROOT"
+	local NEW_GOROOT=""
+
+	# nothing to reconcile: no go on PATH, no GOROOT recorded, or the active go
+	# already lives below the recorded GOROOT.
+	[[ -z "${ACTIVE_GO}" || -z "${OLD_GOROOT}" ]] && return 0
+	[[ "${ACTIVE_GO}" == "${OLD_GOROOT}/bin/go" ]] && return 0
+
+	NEW_GOROOT="$(unset GOROOT; go env GOROOT 2> /dev/null)"
+
+	# never write an empty or unchanged value into tracked state.
+	[[ -z "${NEW_GOROOT}" || "${NEW_GOROOT}" == "${OLD_GOROOT}" ]] && return 0
+	[[ -f "${env_file}" ]] || return 0
+
+	local _line _content=""
+	while IFS= read -r _line || [[ -n "${_line}" ]]; do
+		# both sides are quoted so that they are taken literally rather than
+		# as a glob pattern or (bash 5.2 patsub_replacement) an "&" reference.
+		_content+="${_line//"${OLD_GOROOT}"/"${NEW_GOROOT}"}"$'\n'
+	done < "${env_file}"
+	printf '%s' "${_content}" > "${env_file}" || return 1
+
+	. "${env_file}" &> /dev/null
+	return 0
 }
