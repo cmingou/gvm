@@ -9,7 +9,7 @@ gvm() {
 	fi
 
 	if [[ -z "$GVM_NO_GIT_BAK" && -d $GVM_ROOT/.git ]]; then
-		display_error "Looks like the .git directory is present. Please reinstall GVM."
+		display_error "Looks like the .git directory is present. Run 'mv \"\$GVM_ROOT/.git\" \"\$GVM_ROOT/git.bak\"' to repair the install, or set GVM_NO_GIT_BAK=1 for a development checkout."
 		return 1
 	fi
 
