@@ -1,0 +1,148 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Keep .git in place (scripts/env/gvm refuses to run otherwise) and never
+  # touch the runner's shell profile.
+  GVM_NO_GIT_BAK: 1
+  GVM_NO_UPDATE_PROFILE: 1
+
+jobs:
+  tf-tests:
+    # ubuntu gives bash 5, macOS gives the bash 3.2 that ships with it, which
+    # is the oldest shell this project supports.
+    name: tf tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install the tf test runner
+        run: gem install tf -v '>=0.4.1' --no-document
+
+      - name: Generate the de_DE locale
+        # tests/gvm_cd_locale_comment_test.sh switches to a non-English locale
+        # to cover issue #6. Without the locale present bash keeps its English
+        # messages and the test still passes, but it no longer tests anything.
+        if: runner.os == 'Linux'
+        run: |
+          sudo locale-gen de_DE.UTF-8
+          sudo update-locale
+
+      - name: Install gvm into a throwaway root
+        run: |
+          SRC_REPO="$GITHUB_WORKSPACE" binscripts/gvm-installer \
+            "$(git rev-parse HEAD)" "$RUNNER_TEMP/gvm-tf"
+
+      - name: Run the comment test suite
+        run: |
+          export GVM_ROOT="$RUNNER_TEMP/gvm-tf/gvm"
+
+          # Every tests/*_comment_test.sh runs, so a test added with a fix is
+          # gated without touching this workflow. The exceptions:
+          #
+          #   00gvm_install  compiles go1.4.3, master, go1.6.4 and go1.7.6 from
+          #                  source, which takes tens of minutes and no longer
+          #                  builds reliably on current toolchains.
+          #   gvm_alias      needs the versions 00gvm_install leaves behind.
+          #   gvm_use        likewise.
+          #   zzgvm_implode  deletes GVM_ROOT, so it runs last in its own root.
+          suite=()
+          for test_file in "$GVM_ROOT"/tests/*_comment_test.sh; do
+            case "$(basename "$test_file")" in
+              00gvm_install_comment_test.sh) continue ;;
+              gvm_alias_comment_test.sh) continue ;;
+              gvm_use_comment_test.sh) continue ;;
+              zzgvm_implode_comment_test.sh) continue ;;
+            esac
+            suite+=("$test_file")
+          done
+          printf 'running %s test file(s)\n' "${#suite[@]}"
+
+          # Sourcing the integration ends in `cd .`, whose helper returns
+          # non-zero when the directory has no .go-version, which would trip
+          # the errexit this step runs under.
+          set +e
+          source "$GVM_ROOT/scripts/gvm"
+          set -e
+
+          tf --text "${suite[@]}"
+
+      - name: Run the implode test in its own root
+        run: |
+          SRC_REPO="$GITHUB_WORKSPACE" binscripts/gvm-installer \
+            "$(git rev-parse HEAD)" "$RUNNER_TEMP/gvm-implode"
+          export GVM_ROOT="$RUNNER_TEMP/gvm-implode/gvm"
+          set +e
+          source "$GVM_ROOT/scripts/gvm"
+          set -e
+          tf --text "$GVM_ROOT/tests/zzgvm_implode_comment_test.sh"
+
+  smoke:
+    # tf picks its runner from a shebang and its exit-status capture is
+    # unreliable under zsh -- it reports a successful `gvm use` as failed --
+    # so zsh is covered by tests/shell_smoke.sh, which asserts without tf.
+    name: smoke (${{ matrix.os }}, ${{ matrix.shell }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        shell: [bash, zsh]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zsh
+        if: matrix.shell == 'zsh' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zsh
+
+      - name: Install gvm into a throwaway root
+        run: |
+          SRC_REPO="$GITHUB_WORKSPACE" binscripts/gvm-installer \
+            "$(git rev-parse HEAD)" "$RUNNER_TEMP/gvm-smoke"
+
+      - name: Run the shell integration smoke test
+        run: |
+          export GVM_ROOT="$RUNNER_TEMP/gvm-smoke/gvm"
+          ${{ matrix.shell }} "$GVM_ROOT/tests/shell_smoke.sh"
+
+  all-tests:
+    # Single stable check name for the branch protection rule on master: the
+    # matrix legs change, this does not.
+    name: all tests passed
+    runs-on: ubuntu-latest
+    needs: [tf-tests, smoke]
+    if: always()
+    steps:
+      - name: Check the results of every test job
+        run: |
+          echo "tf-tests: ${{ needs.tf-tests.result }}"
+          echo "smoke:    ${{ needs.smoke.result }}"
+          if [ "${{ needs.tf-tests.result }}" != "success" ] \
+            || [ "${{ needs.smoke.result }}" != "success" ]; then
+            echo "::error::one or more test jobs did not succeed"
+            exit 1
+          fi
