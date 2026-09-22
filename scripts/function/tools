@@ -14,3 +14,9 @@ GREP_PATH=$(unalias grep &> /dev/null; command -v grep) || display_error "$GREP_
 EGREP_PATH=$(unalias egrep &> /dev/null; command -v egrep) || display_error "$EGREP_ERROR" || return 1
 SORT_PATH=$(unalias sort &> /dev/null; command -v sort) || display_error "$SORT_ERROR" || return 1
 HEAD_PATH=$(unalias head &> /dev/null; command -v head) || display_error "$HEAD_ERROR" || return 1
+
+# Exported so that the functions consuming them (gvm_export_path, gvm use,
+# gvm pkgset use) still find them in an environment that carries gvm's
+# functions but not the shell's unexported variables (issue #15). Kept apart
+# from the assignments above: `export VAR=$(cmd)` would hide cmd's status.
+export LS_PATH TR_PATH SED_PATH GREP_PATH EGREP_PATH SORT_PATH HEAD_PATH
