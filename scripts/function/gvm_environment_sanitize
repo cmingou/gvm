@@ -11,9 +11,11 @@
 #
 # The file is only ever rewritten with a non-empty, changed GOROOT: writing an
 #   empty value corrupts the file and makes every later call fail with
-#   "sed: first RE may not be empty" (issue #23). The rewrite uses shell
-#   builtins instead of "sed -i", whose in-place syntax differs between GNU
-#   and BSD sed and leaves a stray "<name>-e" backup file behind on macOS.
+#   "sed: first RE may not be empty" (issue #23). The rewrite uses awk's
+#   literal index()/substr() rather than "sed -i", whose in-place syntax
+#   differs between GNU and BSD sed and leaves a stray "<name>-e" backup file
+#   behind on macOS, and rather than the shell's own pattern substitution,
+#   which bash 3.2 and bash 5 quote differently (issue #48).
 # @param name Name of the environment file below $GVM_ROOT/environments
 # @return Returns success (status 0) when nothing needed to change or the file
 #   was rewritten, or failure (status 1) if the file could not be written.
@@ -35,13 +37,27 @@ function gvm_environment_sanitize() {
 	[[ -z "${NEW_GOROOT}" || "${NEW_GOROOT}" == "${OLD_GOROOT}" ]] && return 0
 	[[ -f "${env_file}" ]] || return 0
 
-	local _line _content=""
-	while IFS= read -r _line || [[ -n "${_line}" ]]; do
-		# both sides are quoted so that they are taken literally rather than
-		# as a glob pattern or (bash 5.2 patsub_replacement) an "&" reference.
-		_content+="${_line//"${OLD_GOROOT}"/"${NEW_GOROOT}"}"$'\n'
-	done < "${env_file}"
-	printf '%s' "${_content}" > "${env_file}" || return 1
+	# Replace with awk's index()/substr(), which are literal: no glob pattern,
+	# no regex metacharacters and no "&" backreference in the replacement. The
+	# shell's own "${var//pat/rep}" is not used here because quoting inside it
+	# is not handled the same way by the bash 3.2 that macOS ships as by bash 5
+	# (issue #48), and leaving the quotes off would make a path containing a
+	# glob character expand. Writing through a temporary file keeps the
+	# original intact if the rewrite fails, and avoids "sed -i", whose syntax
+	# differs between GNU and BSD.
+	local tmp_file="${env_file}.gvm-sanitize.$$"
+	OLD_GOROOT="${OLD_GOROOT}" NEW_GOROOT="${NEW_GOROOT}" awk '
+		BEGIN { old = ENVIRON["OLD_GOROOT"]; new = ENVIRON["NEW_GOROOT"] }
+		{
+			out = ""
+			while ((i = index($0, old)) > 0) {
+				out = out substr($0, 1, i - 1) new
+				$0 = substr($0, i + length(old))
+			}
+			print out $0
+		}
+	' "${env_file}" > "${tmp_file}" || { rm -f "${tmp_file}"; return 1; }
+	mv "${tmp_file}" "${env_file}" || { rm -f "${tmp_file}"; return 1; }
 
 	. "${env_file}" &> /dev/null
 	return 0
