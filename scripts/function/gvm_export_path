@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 function gvm_export_path() {
+	# The tool paths are set by scripts/function/tools, which is sourced into
+	# the shell but does not reach an environment that carries gvm's functions
+	# without its unexported variables. Without them the pipeline below
+	# collapsed to "$GVM_ROOT/bin:" and PATH was wiped with exit status 0
+	# (issue #15). Reload them, and refuse rather than touch PATH when that
+	# does not help.
+	if [[ -z "$TR_PATH" || -z "$GREP_PATH" || -z "$EGREP_PATH" || -z "$SED_PATH" ]]; then
+		. "$GVM_ROOT/scripts/function/tools" > /dev/null 2>&1
+	fi
+	if [[ -z "$TR_PATH" || -z "$GREP_PATH" || -z "$EGREP_PATH" || -z "$SED_PATH" ]]; then
+		display_error "Could not find the tools gvm needs (tr, grep, egrep, sed). PATH left unchanged."
+		return 1
+	fi
+
 	export PATH="$GVM_ROOT/bin:$(echo "$PATH" | $TR_PATH ":" "\n" | "$GREP_PATH" -v '^$' | $EGREP_PATH -v "$GVM_ROOT/(pkgsets|gos|bin)" | $TR_PATH "\n" ":" | $SED_PATH 's/:*$//')"
 	export GVM_PATH_BACKUP="$PATH"
 }
-
