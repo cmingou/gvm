@@ -2,8 +2,24 @@
 
 . "$GVM_ROOT/scripts/functions"
 
-[[ -d $GVM_ROOT/.git ]] || mv "$GVM_ROOT/git.bak" "$GVM_ROOT/.git" &> /dev/null ||
-	display_fatal "Couldn't find git info"
+# Put the git metadata back into the layout this script found it in. This runs
+# on every exit, so a failure part-way through (bad branch name, network error,
+# Ctrl-C) never leaves ".git" behind: scripts/env/gvm refuses to run any
+# command while it is present (issue #24).
+__gvm_get_restore_git() {
+	[[ "${git_restored_from_bak}" == true && -d "$GVM_ROOT/.git" ]] || return 0
+	mv "$GVM_ROOT/.git" "$GVM_ROOT/git.bak" ||
+		display_warning "Couldn't backup git info. Please run: mv \"$GVM_ROOT/.git\" \"$GVM_ROOT/git.bak\""
+}
+
+git_restored_from_bak=false
+if [[ ! -d $GVM_ROOT/.git ]]; then
+	mv "$GVM_ROOT/git.bak" "$GVM_ROOT/.git" &> /dev/null ||
+		display_fatal "Couldn't find git info"
+	git_restored_from_bak=true
+fi
+trap __gvm_get_restore_git EXIT
+trap 'exit 1' HUP INT TERM
 
 builtin cd "$GVM_ROOT"
 
@@ -14,5 +30,3 @@ else
 fi
 
 git pull || display_fatal "Failed to update"
-
-mv ".git" "git.bak" || display_fatal "Couldn't backup git info"
