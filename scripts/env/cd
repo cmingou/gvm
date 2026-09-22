@@ -18,8 +18,12 @@ fi
 
 if __gvm_is_function cd; then
     eval "$(echo "__gvm_oldcd()"; declare -f cd | sed '1 s/{/\'$'\n''{/' | tail -n +2)"
-elif [[ "$(builtin type cd)" == "cd is a shell builtin" ]]; then
-    eval "$(echo "__gvm_oldcd() { builtin cd \$*; return \$?; }")"
+else
+    # cd is not a function, so delegate to the builtin. This must not depend
+    # on the output of 'type cd': bash localizes that message, so comparing it
+    # against the English text left __gvm_oldcd undefined under any other
+    # locale and turned cd() into a no-op (issue #6).
+    __gvm_oldcd() { builtin cd "$@"; }
 fi
 
 # Path cleanup
