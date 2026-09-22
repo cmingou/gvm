@@ -3,6 +3,10 @@
 . "$GVM_ROOT/scripts/functions" || return 1
 
 gvm() {
+	# Any gvm command can add, remove or switch a go version, which is what
+	# the fallback cd() caches is derived from (issue #49).
+	__gvmp_fallback_cached=""
+
 	if [[ "$GVM_ROOT" == "" ]]; then
 		display_error "GVM_ROOT not set. Try running: \'source \$GVM_ROOT/scripts/gvm\'."
 		return 1
