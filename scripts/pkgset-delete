@@ -23,3 +23,13 @@ rm -rf "$target_top/pkgsets/$gvm_go_name/$target_set_name" ||
 rm -rf "$target_top/environments/$gvm_go_name@$target_set_name" ||
     display_fatal "Could not delete package set"
 
+if [[ $1 == "--local" ]]; then
+	# A local pkgset lives in a .gvm_local skeleton of its own, and `gvm pkgset
+	# list` shows the project as a local pkgset for as long as that directory
+	# exists. Remove whatever part of it is now empty, so that the listing
+	# stops once the last local pkgset is gone (issue #34). rmdir refuses a
+	# directory that still holds another Go version's local pkgset, which is
+	# what keeps that one intact.
+	rmdir "$target_top/pkgsets/$gvm_go_name" "$target_top/pkgsets" \
+		"$target_top/environments" "$target_top" > /dev/null 2>&1 || true
+fi
