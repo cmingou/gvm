@@ -9,10 +9,14 @@ target_set_name=$1
 target_set_name_str=$1
 add_gopath="$GVM_ROOT/pkgsets/$gvm_go_name/$1"
 add_path="$GVM_ROOT/pkgsets/$gvm_go_name/$1/bin"
+# Root the environment file refers to for its overlay paths: a standard pkgset
+# follows $GVM_ROOT, written literally so that it expands when the file is
+# sourced; a local pkgset lives outside $GVM_ROOT, under the project (issue #33).
+env_root='${GVM_ROOT}'
 
 if [[ $1 == "--local" ]]; then
 	LOCAL_TOP=$(find_local_pkgset)
-	if [[ ! -d LOCAL_TOP ]]; then
+	if [[ ! -d "$LOCAL_TOP" ]]; then
 		LOCAL_TOP=$PWD
 	fi
 	target_top=$LOCAL_TOP/.gvm_local
@@ -22,34 +26,39 @@ if [[ $1 == "--local" ]]; then
 	add_gopath="$LOCAL_TOP:$add_gopath"
 	add_path="$target_top/pkgsets/$gvm_go_name/$target_set_name/bin"
 	add_path="$LOCAL_TOP/bin:$add_path"
+	env_root="$target_top"
 fi
 
-[[ ! -f "$target_top/environments/$gvm_go_name@$target_set_name" ]] ||
+env_file="$target_top/environments/$gvm_go_name@$target_set_name"
+
+[[ ! -f "$env_file" ]] ||
 	display_fatal "Packageset already exists!"
 
 mkdir -p "$target_top/environments" ||
 	display_fatal "Could not create environments folder"
 mkdir -p "$target_top/pkgsets/$gvm_go_name/$target_set_name" ||
 	display_fatal "Could not create packageset folder"
-cp "$GVM_ROOT/environments/$gvm_go_name" "$target_top/environments/$gvm_go_name@$target_set_name" ||
+cp "$GVM_ROOT/environments/$gvm_go_name" "$env_file" ||
 	display_fatal "Could copy environment"
-echo "export gvm_pkgset_name=\"$target_set_name_str\"" >> "$target_top/environments/$gvm_go_name@$target_set_name" ||
+echo "export gvm_pkgset_name=\"$target_set_name_str\"" >> "$env_file" ||
 	display_fatal "Could not extend environment"
-echo "export GOPATH; GOPATH=\"$add_gopath:\$GOPATH\"" >> "$target_top/environments/$gvm_go_name@$target_set_name" ||
+echo "export GOPATH; GOPATH=\"$add_gopath:\$GOPATH\"" >> "$env_file" ||
 	display_fatal "Could not extend environment"
-echo "export PATH; PATH=\"$add_path:\$PATH\"" >> "$target_top/environments/$gvm_go_name@$target_set_name" ||
+echo "export PATH; PATH=\"$add_path:\$PATH\"" >> "$env_file" ||
 	display_fatal "Could not extend environment"
 
 if [ "${target_set_name}" != "global" ]; then
-  echo "# Package Set-Specific Overrides" >> "${GVM_ROOT}/environments/${gvm_go_name}@${target_set_name}"
-	echo "export GVM_OVERLAY_PREFIX; GVM_OVERLAY_PREFIX=\"\${GVM_ROOT}/pkgsets/${gvm_go_name}/${target_set_name}/overlay\"" >> "${GVM_ROOT}/environments/${gvm_go_name}@${target_set_name}"
-  mkdir -p "${GVM_ROOT}/pkgsets/${gvm_go_name}/${target_set_name}/overlay/"{bin,lib/pkgconfig}
-  echo "export PATH; PATH=\"${GVM_ROOT}/pkgsets/${gvm_go_name}/${target_set_name}/bin:\${GVM_OVERLAY_PREFIX}/bin:\${PATH}\"" >> "$GVM_ROOT/environments/${gvm_go_name}@${target_set_name}" ||
-	  display_fatal "Could not extend environment"
-  echo "export LD_LIBRARY_PATH; LD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${LD_LIBRARY_PATH}\"" >> "${GVM_ROOT}/environments/${gvm_go_name}@${target_set_name}" ||
-	  display_fatal "Could not extend environment"
-  echo "export DYLD_LIBRARY_PATH; DYLD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${DYLD_LIBRARY_PATH}\"" >> "${GVM_ROOT}/environments/${gvm_go_name}@${target_set_name}" ||
-	  display_fatal "Could not extend environment"
-  echo "export PKG_CONFIG_PATH; PKG_CONFIG_PATH=\"\${GVM_OVERLAY_PREFIX}/lib/pkgconfig:\${PKG_CONFIG_PATH}\"" >> "${GVM_ROOT}/environments/${gvm_go_name}@${target_set_name}" ||
-	  display_fatal "Could not extend environment"
+	# The overlay block used to be written to ${GVM_ROOT} unconditionally, so a
+	# local pkgset got a phantom global "local" pkgset instead of its overlay.
+	echo "# Package Set-Specific Overrides" >> "$env_file"
+	echo "export GVM_OVERLAY_PREFIX; GVM_OVERLAY_PREFIX=\"${env_root}/pkgsets/${gvm_go_name}/${target_set_name}/overlay\"" >> "$env_file"
+	mkdir -p "${target_top}/pkgsets/${gvm_go_name}/${target_set_name}/overlay/"{bin,lib/pkgconfig}
+	echo "export PATH; PATH=\"${target_top}/pkgsets/${gvm_go_name}/${target_set_name}/bin:\${GVM_OVERLAY_PREFIX}/bin:\${PATH}\"" >> "$env_file" ||
+		display_fatal "Could not extend environment"
+	echo "export LD_LIBRARY_PATH; LD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${LD_LIBRARY_PATH}\"" >> "$env_file" ||
+		display_fatal "Could not extend environment"
+	echo "export DYLD_LIBRARY_PATH; DYLD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${DYLD_LIBRARY_PATH}\"" >> "$env_file" ||
+		display_fatal "Could not extend environment"
+	echo "export PKG_CONFIG_PATH; PKG_CONFIG_PATH=\"\${GVM_OVERLAY_PREFIX}/lib/pkgconfig:\${PKG_CONFIG_PATH}\"" >> "$env_file" ||
+		display_fatal "Could not extend environment"
 fi
