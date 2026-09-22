@@ -21,7 +21,7 @@ gvm pkgset list # status=0; match=/L .*tmp-pkgset-delete\/proj$/
 gvm pkgset delete --local # status=0
 ls -d $GVM_ROOT/tmp-pkgset-delete/proj/.gvm_local # status!=0
 gvm pkgset list # status=0; match!=/L .*tmp-pkgset-delete/
-ls $GVM_ROOT/tmp-pkgset-delete/proj # match!=/gvm_local/
+ls -a $GVM_ROOT/tmp-pkgset-delete/proj # match!=/gvm_local/
 
 ## deleting it again must fail, as for any pkgset that does not exist
 gvm pkgset delete --local # status!=0; match=/doesn't exist/
