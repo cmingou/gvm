@@ -50,7 +50,10 @@ export PATH="$(__gvm_munge_path)"
 cd() {
     # @FIXME: gvm_oldcd is broken on re-sourcing .bashrc!
     if __gvm_is_function __gvm_oldcd; then
-        __gvm_oldcd $*
+        # Propagate the real cd's status: when the directory change itself
+        # fails, "cd x && ..." must not continue, and there is nothing to
+        # auto-switch either (issue #8).
+        __gvm_oldcd "$@" || return $?
     fi
 
     local dot_go_version dot_go_pkgset rslt
