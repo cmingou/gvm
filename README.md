@@ -63,7 +63,9 @@ Installing
 
 To install:
 
-1.  Install [Bison](https://www.gnu.org/software/bison/):
+1.  Install [Bison](https://www.gnu.org/software/bison/), which gvm needs
+    only to compile Go from source (`gvm install goX.Y -B` installs a binary
+    release and needs no C toolchain):
 
     ```
     sudo apt-get install bison

@@ -24,6 +24,10 @@ command -v go &> /dev/null || display_fatal "Only available in versions after Go
 
 [ -z "$1" ] && display_list
 
+# Cross compiling builds the tool chain and runtime library, which needs the
+# compiler toolchain that scripts/gvm-check looks for (issue #18).
+"$GVM_ROOT/scripts/gvm-check" || display_fatal "Missing requirements."
+
 if [ ! -f "$GOROOT/pkg/tool/cross" ]; then
 	display_message "Installing x86, x86-64, and ARM commands"
 	set -e
