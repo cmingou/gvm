@@ -96,6 +96,23 @@ rslt=$?
 assert_equal "a failing cd returns non-zero" "1" "$([ "$rslt" -ne 0 ] && echo 1 || echo 0)"
 assert_match "a failing cd does not change directory" "versioned" "$PWD"
 
+# a .go-version without a usable version is ignored, and cd still succeeds
+# and changes directory (issue #10)
+mkdir -p "$workdir/garbage" "$workdir/bare"
+printf 'not a version\n' > "$workdir/garbage/.go-version"
+printf '%s\n' "${version#go}" > "$workdir/bare/.go-version"
+gvm use "$version" --quiet
+cd "$workdir/garbage" > /dev/null
+rslt=$?
+assert_equal "cd with an unusable .go-version returns 0" "0" "$rslt"
+assert_match "cd with an unusable .go-version changes directory" "garbage" "$PWD"
+assert_equal "cd with an unusable .go-version keeps the version" "$version" "$gvm_go_name"
+
+# the bare form without the "go" prefix is accepted (issue #10)
+cd "$workdir/plain"
+cd "$workdir/bare" > /dev/null
+assert_equal "cd accepts a .go-version without the go prefix" "$version" "$gvm_go_name"
+
 # PATH munging must keep entries containing whitespace intact (issue #12)
 munged="$(__gvm_munge_path "/usr/bin:/opt/My Tools/bin:/bin")"
 assert_equal "munge_path splits on ':' only" "/usr/bin:/opt/My Tools/bin:/bin" "$munged"
