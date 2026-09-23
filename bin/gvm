@@ -23,10 +23,11 @@ if [[ $command == "implode" ]]; then
 	exit 0
 fi
 
-"$GVM_ROOT/scripts/gvm-check"
-if [[ "$?" != "0" ]]; then
-	display_fatal "Missing requirements."
-fi
+# The C toolchain that scripts/gvm-check looks for is needed only to compile
+# Go from source, so the check runs where that happens (scripts/install and
+# scripts/cross) rather than ahead of every command. Gating everything on it
+# refused `gvm list`, `gvm version` and binary installs on a machine without
+# bison, gcc or make, and cost every command a check it never used (issue #18).
 
 if [[ $command == "version" ]]; then
 	display_message "Go Version Manager v$GVM_VERSION installed at $GVM_ROOT"

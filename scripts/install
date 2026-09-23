@@ -295,6 +295,10 @@ install_goprotobuf() {
 }
 
 install_from_source() {
+	# Compiling needs the toolchain that scripts/gvm-check looks for; a binary
+	# install does not, so the check lives here rather than in bin/gvm
+	# (issue #18). It runs before the Go source is cloned.
+	"$GVM_ROOT/scripts/gvm-check" || display_fatal "Missing requirements."
 	download_source
 	check_tag
 	if [[ "$?" == "1" ]]; then
