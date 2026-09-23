@@ -140,8 +140,16 @@ cd() {
     if [[ $rslt -eq 0 ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found dot_go_version: ${dot_go_version}"
         local use_goversion="$(__gvmp_read_dot_go_version "${dot_go_version}")"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
-        gvm use "${use_goversion}" || return 1
+        if [[ -n "${use_goversion}" ]]; then
+            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
+            gvm use "${use_goversion}" || return 1
+        else
+            # The file holds nothing that reads as a version. The directory
+            # change itself has already succeeded, so this is not a cd()
+            # failure: say what is being ignored and keep the current version,
+            # instead of running `gvm use ""` and returning 1 (issue #10).
+            display_warning "Ignoring ${dot_go_version}: it does not contain a go version"
+        fi
         unset use_goversion
     elif [[ -n "${defaults_go_name}" ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-version found. Using system or default go."
@@ -273,6 +281,10 @@ __gvmp_read_dot_go_version() {
     local filepath="${1}"
     local version=""
     local regex='^(go([0-9]+(\.[0-9]+)*))$'
+    # goenv, asdf and the go.mod toolchain directive write the version without
+    # the "go" prefix; that form is accepted and named the way `gvm install`
+    # names it (issue #10).
+    local bare_regex='^([0-9]+(\.[0-9]+)*)$'
 
     while IFS=$'\n' read -r _line; do
         # skip comment lines
@@ -281,6 +293,11 @@ __gvmp_read_dot_go_version() {
         # looking for pattern "go1.2[.3]"
         if [[ "${_line}" =~ ${regex} ]]; then
             version="${_line}"
+            break
+        fi
+        # or the bare "1.2[.3]"
+        if [[ "${_line}" =~ ${bare_regex} ]]; then
+            version="go${_line}"
             break
         fi
     done <<< "$(cat "${filepath}")"
