@@ -38,9 +38,22 @@ mkdir -p "$target_top/environments" ||
 	display_fatal "Could not create environments folder"
 mkdir -p "$target_top/pkgsets/$gvm_go_name/$target_set_name" ||
 	display_fatal "Could not create packageset folder"
-cp "$GVM_ROOT/environments/$gvm_go_name" "$env_file" ||
-	display_fatal "Could copy environment"
-echo "export gvm_pkgset_name=\"$target_set_name_str\"" >> "$env_file" ||
+# The pkgset environment sources the version environment instead of carrying
+# a copy of it. A copy is a one-time snapshot: an edit made afterwards through
+# a bare `gvm pkgenv` (which opens the version environment) was honoured by
+# `gvm use` and silently discarded by `gvm pkgset use` (issue #36). GVM_ROOT
+# is written first, as in the version environment, so the file still stands on
+# its own when it is copied to environments/default and sourced at login.
+echo "export GVM_ROOT; GVM_ROOT=\"$GVM_ROOT\"" > "$env_file" ||
+	display_fatal "Could not create environment"
+echo ". \"\${GVM_ROOT}/environments/$gvm_go_name\" || return 1" >> "$env_file" ||
+	display_fatal "Could not extend environment"
+# Written in the `export VAR; VAR="value"` form that cd() parses out of
+# environments/default; the version environment sourced above sets the same
+# two names, so they are stated again here in this file's own right.
+echo "export gvm_go_name; gvm_go_name=\"$gvm_go_name\"" >> "$env_file" ||
+	display_fatal "Could not extend environment"
+echo "export gvm_pkgset_name; gvm_pkgset_name=\"$target_set_name_str\"" >> "$env_file" ||
 	display_fatal "Could not extend environment"
 echo "export GOPATH; GOPATH=\"$add_gopath:\$GOPATH\"" >> "$env_file" ||
 	display_fatal "Could not extend environment"
