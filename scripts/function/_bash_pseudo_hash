@@ -336,7 +336,12 @@ _decode() {
         return 1
     fi
 
-    new_string="$(printf '%b' "${string//%/\\x}")"
+    # The "%" is escaped: unescaped, zsh reads a leading "%" in the pattern
+    # of ${var//pat/rep} as an end-of-string anchor rather than a literal, so
+    # nothing was decoded and every value holding an encoded character (any
+    # path, for one) came back still percent-encoded (issue #37). Bash treats
+    # "\%" as the literal "%" as well.
+    new_string="$(printf '%b' "${string//\%/\\x}")"
     printf "%b" "${new_string}"
 
     if [[ -z "${new_string}" ]]; then

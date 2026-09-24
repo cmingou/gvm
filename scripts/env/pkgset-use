@@ -48,7 +48,14 @@ gvm_pkgset_use() {
     #   GVM_REMATCH[1]: pkgset name (e.g. my-pkgset, /home/me/dev/project)
     #
     local pkgset_regex="^([A-Za-z0-9]+[A-Za-z0-9._#:%\/\+\-]+)$"
-    local local_pkgset_regex="^(\/[^:\\\n\\\0]*)+$"
+    # A local pkgset is an absolute path: it starts with "/" and contains no
+    # ":". The set is written with a POSIX class and no backslash escapes on
+    # purpose: the previous "[^:\\\n\\\0]" inside a double-quoted string
+    # reached the regex engine as a set excluding the letters "n" and "0",
+    # not newline and NUL, so most real paths were rejected as an
+    # "Unrecognized command line argument" (issue #37). [:cntrl:] excludes
+    # the newline and NUL the original meant to.
+    local local_pkgset_regex='^(/[^:[:cntrl:]]*)$'
     local pkgset_rematch local_pkgset_rematch
 
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "gvm_pkgset_use: \$@   => $@"
@@ -89,7 +96,7 @@ gvm_pkgset_use() {
             # element in the accumulator must be the option for which this
             # regex matches, we then just add the value.
             accumulator+=( "${GVM_REMATCH[1]}" )
-        elif [[ "${local_pkgset_rematch}" == true ]] && $(( ${#accumulator[@]}%2 )) -eq 0 ]]; then
+        elif [[ "${local_pkgset_rematch}" == true ]] && [[ $(( ${#accumulator[@]}%2 )) -eq 0 ]]; then
             accumulator+=( "--local" "${GVM_REMATCH[1]}")
         elif [[ "${local_pkgset_rematch}" == true ]] && [[ -n "$(valueForKeyFakeAssocArray "--local" "${options_hash[*]}")" ]]; then
             # --local is a special case: for legacy compatibility we need to
