@@ -22,7 +22,9 @@ __gvm_resolve_fallback_pkgset() {
     local version="${1:-$gvm_go_name}"
     local pkgset=""
     local pkgset_regex='^([[:space:]]*[=>*]*[[:space:]]+)([A-Za-z0-9._#:%\/\+\-]+)$'
-    local local_pkgset_regex='^([[:space:]]*[=>*]*)(L[[:space:]]+)(\/[^:\\\n\\\0]*)+$'
+    # The path set uses a POSIX class rather than "[^:\\\n\\\0]", which the
+    # regex engine read as a set excluding the letters "n" and "0" (issue #37).
+    local local_pkgset_regex='^([[:space:]]*[=>*]*)(L[[:space:]]+)(/[^:[:cntrl:]]*)$'
     local goversion_regex='^([[:space:]]*[=>*]*)(G[[:space:]]+)(go([0-9]+(\.[0-9]+)*))$'
 
     [[ "x${version}" == "x" ]] && echo "" && return 1

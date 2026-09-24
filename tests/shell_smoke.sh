@@ -113,6 +113,22 @@ cd "$workdir/plain"
 cd "$workdir/bare" > /dev/null
 assert_equal "cd accepts a .go-version without the go prefix" "$version" "$gvm_go_name"
 
+# a local pkgset must be selectable by its path, which holds "/", "n" and "0"
+# (issue #37: the path pattern rejected "n" and "0", and under zsh the
+# pseudo-hash never decoded the "/")
+mkdir -p "$workdir/john0/proj"
+gvm use "$version" --quiet
+cd "$workdir/john0/proj"
+gvm pkgset create --local > /dev/null 2>&1
+cd "$workdir/plain"
+gvm pkgset use --local "$workdir/john0/proj" --quiet
+assert_equal "gvm pkgset use --local <path> selects the local pkgset" "__local__" "$gvm_pkgset_name"
+assert_match "gvm pkgset use --local <path> sets the overlay prefix" "john0/proj/.gvm_local/" "$GVM_OVERLAY_PREFIX"
+gvm use "$version" --quiet
+gvm pkgset use "$workdir/john0/proj" --quiet
+assert_equal "gvm pkgset use <path> selects the local pkgset" "__local__" "$gvm_pkgset_name"
+gvm use "$version" --quiet
+
 # PATH munging must keep entries containing whitespace intact (issue #12)
 munged="$(__gvm_munge_path "/usr/bin:/opt/My Tools/bin:/bin")"
 assert_equal "munge_path splits on ':' only" "/usr/bin:/opt/My Tools/bin:/bin" "$munged"
