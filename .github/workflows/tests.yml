@@ -6,9 +6,12 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# A new push to a PR supersedes its older run. Pushes to master get one group
+# per commit: a shared group would cancel the pending run of a commit merged
+# right before another, leaving that master commit untested.
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
