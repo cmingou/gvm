@@ -6,11 +6,12 @@
 # /*!
 # @abstract Generate a new PATH with gvm and rvm elements in the correct order
 # @discussion
-# Scans path and Removes any existing elements that refer to the .gvm directory,
-#   extracts and preserves elements that refer to the .rvm directory, preserves
-#   all other elements. Builds a new PATH in this order:
+# Scans path and extracts the elements that live below $GVM_ROOT or inside a
+#   project's .gvm_local (a local pkgset), extracts and preserves elements that
+#   refer to the .rvm directory, preserves all other elements. Builds a new
+#   PATH in this order:
 #     * .rvm elements
-#     * .gvm elements
+#     * gvm elements
 #     * all other entries
 #
 #  The purpose of mungeing is to generate a new path dynamically so that user
@@ -33,7 +34,7 @@ __gvm_munge_path() {
     local path_dedupe_flag="${2:-true}"
     local rvm_regex='([^:\\\n\\\0]+\.rvm{1}[^:\\\n\\\0]+)'
     local rvm_ary; rvm_ary=()
-    local gvm_regex='([^:\\\n\\\0]+\.gvm{1}[^:\\\n\\\0]+)'
+    local gvm_root="${GVM_ROOT%/}"
     local gvm_ary; gvm_ary=()
     local general_ary; general_ary=()
     local defaultIFS="$IFS"
@@ -65,7 +66,14 @@ __gvm_munge_path() {
     local _path
     for _path in "${path_in_ary[@]}"
     do
-        if [[ "${_path}" =~ $gvm_regex ]]
+        # A gvm element lives below $GVM_ROOT, or inside a project's
+        # .gvm_local for a local pkgset. Matching the literal ".gvm" instead
+        # promoted any unrelated element that happened to contain it above
+        # the selected toolchain and, with a root not named .gvm, ranked the
+        # real toolchain with the rest (issue #13). The root is compared as a
+        # quoted glob prefix, not a regex, so it needs no escaping.
+        if [[ -n "${gvm_root}" && "${_path}" == "${gvm_root}"/* ]] ||
+           [[ "${_path}" == */.gvm_local/* ]]
         then
             # echo "matched (gvm): ${_path}"
             gvm_ary+=( "${_path}" )
