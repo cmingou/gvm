@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# Load the function files once per shell. Every entry point sources this file:
+# scripts/env/gvm and scripts/env/cd both do on every shell startup, and so
+# does each scripts/* subcommand, so without a guard the files below were read
+# twice per startup (issue #3). The guard holds the shell's pid rather than a
+# flag: a child process has a different $$ and still loads them even when the
+# variable reaches it through the environment, while a subshell, which
+# inherits the functions, skips the reload. scripts/gvm-default clears it, so
+# `source $GVM_ROOT/scripts/gvm` always reloads.
+if [[ "${__gvm_functions_loaded:-}" == "$$" ]]; then
+	return 0
+fi
+
 for function in $GVM_ROOT/scripts/function/*; do
 	# function names preceded by an underscore should be loaded by other
 	# scripts explicitly as needed.
@@ -9,3 +21,5 @@ for function in $GVM_ROOT/scripts/function/*; do
 
 	. "$function"
 done
+
+__gvm_functions_loaded="$$"

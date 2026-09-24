@@ -17,6 +17,9 @@ export GVM_VERSION=$(cat "$GVM_ROOT/VERSION")
 export PATH="$GVM_ROOT/bin:$PATH"
 export GVM_PATH_BACKUP="$PATH"
 [ -f "$GVM_ROOT/environments/default" ] && . "$GVM_ROOT/environments/default"
+# scripts/functions loads the function files once per shell (issue #3); clear
+# its guard so that sourcing the integration again picks up the current files.
+__gvm_functions_loaded=""
 . "$GVM_ROOT/scripts/env/gvm"
 
 . "$GVM_ROOT/scripts/env/cd" && cd .
