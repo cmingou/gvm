@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 
 function gvm_implode() {
-  read -p "Are you sure? [y/N] " -n 1 -r
-  echo
+  # The confirmation used `read -p PROMPT -n 1 -r`, which is bash-only: to zsh
+  # -p means "read from a coprocess" and -n "test for input", so the call
+  # failed before reading anything, the removal was always cancelled, and the
+  # function still returned 0 (issue #30). The prompt is printed and a whole
+  # line is read instead, which bash 3.2, bash 5 and zsh all do the same way.
+  printf 'Are you sure? [y/N] '
+  read -r REPLY
+  # the newline the user's Enter provides on a terminal is missing when the
+  # answer is piped in
+  [ -t 0 ] || echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
    display_message "Action cancelled"
  else

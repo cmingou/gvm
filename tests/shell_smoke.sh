@@ -137,6 +137,28 @@ cd "$GVM_ROOT"
 gvm uninstall "$version" > /dev/null 2>&1 || true
 cleanup
 
+# `gvm implode` must read its confirmation in every shell: the bash-only
+# `read -p ... -n 1` it used meant "read from a coprocess" to zsh, so the
+# answer was never read, the removal always "cancelled" and the shell
+# function still returned 0 (issue #30). It is exercised against a throwaway
+# root so that the install under test survives.
+implode_root="$GVM_ROOT/tmp-implode-root"
+rm -rf "$implode_root"
+mkdir -p "$implode_root/gos"
+real_root="$GVM_ROOT"
+. "$GVM_ROOT/scripts/env/implode"
+GVM_ROOT="$implode_root"
+implode_out="$(printf 'n\n' | gvm_implode 2>&1)"
+GVM_ROOT="$real_root"
+assert_match "gvm implode answered n is cancelled" "Action cancelled" "$implode_out"
+assert_equal "gvm implode answered n keeps the root" "yes" "$([ -d "$implode_root" ] && echo yes || echo no)"
+GVM_ROOT="$implode_root"
+implode_out="$(printf 'y\n' | gvm_implode 2>&1)"
+GVM_ROOT="$real_root"
+assert_match "gvm implode answered y removes gvm" "GVM successfully removed" "$implode_out"
+assert_equal "gvm implode answered y removes the root" "no" "$([ -d "$implode_root" ] && echo yes || echo no)"
+rm -rf "$implode_root"
+
 if [ "$failures" -ne 0 ]; then
 	echo "## $failures assertion(s) failed under $shell_name"
 	exit 1
