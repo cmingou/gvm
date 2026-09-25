@@ -42,12 +42,15 @@ echo $gvm_pkgset_name # match=/^upwards$/
 
 ## Moving around inside the project must not switch again: every call cd()
 ## makes to gvm is recorded in a file (a counter variable would not survive a
-## subshell), and none is expected while the version and pkgset already match.
+## subshell), and no `use` or `pkgset use` is expected while the version and
+## pkgset already match. Only those two are counted: on a root with neither a
+## default nor a system environment, cd() also resolves its fallback version
+## through `gvm list --porcelain`, which is unrelated to the switch.
 eval "__gvm_real_gvm() $(declare -f gvm | tail -n +2)" # status=0
 gvm() { echo "$*" >> "$GVM_ROOT/tmp-cd-up/gvm-calls"; __gvm_real_gvm "$@"; } # status=0
 cd $GVM_ROOT/tmp-cd-up/proj/cmd # status=0; match!=/Now using/
 cd $GVM_ROOT/tmp-cd-up/proj # status=0; match!=/Now using/
-cat $GVM_ROOT/tmp-cd-up/gvm-calls 2> /dev/null | wc -l # match=/^ *0$/
+grep -E '^(use|pkgset use) ' $GVM_ROOT/tmp-cd-up/gvm-calls 2> /dev/null | wc -l # match=/^ *0$/
 echo $gvm_go_name # match=/^go0\.0\.17$/
 echo $gvm_pkgset_name # match=/^upwards$/
 
@@ -56,7 +59,8 @@ echo $gvm_pkgset_name # match=/^upwards$/
 ## further up, which the new version's global pkgset no longer satisfies
 cd $GVM_ROOT/tmp-cd-up/proj/cmd/legacy/sub # status=0; match=/Now using version go0.0.16/
 echo $gvm_go_name $gvm_pkgset_name # match=/^go0\.0\.16 upwards$/
-cat $GVM_ROOT/tmp-cd-up/gvm-calls # match=/^use go0\.0\.16\npkgset use upwards$/
+grep -E '^(use|pkgset use) ' $GVM_ROOT/tmp-cd-up/gvm-calls | wc -l # match=/^ *2$/
+grep -E '^(use|pkgset use) ' $GVM_ROOT/tmp-cd-up/gvm-calls # match=/^use go0\.0\.16\npkgset use upwards$/
 unset -f gvm # status=0
 eval "gvm() $(declare -f __gvm_real_gvm | tail -n +2)" # status=0
 unset -f __gvm_real_gvm # status=0
