@@ -215,7 +215,8 @@ gvm_use() {
 
     gvm_export_path
 
-    . "$GVM_ROOT/environments/$fuzzy_match" &> /dev/null || display_error "Couldn't source environment" || return 1
+    # gvm_source_environment keeps the caller's GVM_ROOT (issue #28)
+    gvm_source_environment "$GVM_ROOT/environments/$fuzzy_match" &> /dev/null || display_error "Couldn't source environment" || return 1
     gvm_environment_sanitize "$fuzzy_match"
 
     # fix PATH to correct order
