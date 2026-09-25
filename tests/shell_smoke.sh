@@ -44,13 +44,15 @@ assert_equal() {
 }
 
 version="go0.0.9"
+relocated="go0.0.10"
 pkgset="smoketest"
 workdir="$GVM_ROOT/tmp-smoke"
 
 cleanup() {
 	rm -rf "$GVM_ROOT/gos/$version" "$GVM_ROOT/pkgsets/$version" \
 		"$GVM_ROOT/environments/$version" "$GVM_ROOT/environments/$version@$pkgset" \
-		"$workdir"
+		"$GVM_ROOT/gos/$relocated" "$GVM_ROOT/pkgsets/$relocated" \
+		"$GVM_ROOT/environments/$relocated" "$workdir"
 }
 cleanup
 
@@ -76,6 +78,23 @@ assert_match "cd is overridden" "cd" "$(command -v cd)"
 gvm use "$version" --quiet
 assert_equal "gvm use sets gvm_go_name" "$version" "$gvm_go_name"
 assert_equal "gvm use sets GOROOT" "$GVM_ROOT/gos/$version" "$GOROOT"
+
+# an environment written for another root must not replace the caller's
+# GVM_ROOT, and its paths must expand against the caller's root (issue #28)
+mkdir -p "$GVM_ROOT/gos/$relocated/bin" "$GVM_ROOT/pkgsets/$relocated/global"
+{
+	printf 'export GVM_ROOT; GVM_ROOT="/nonexistent/install-time-root"\n'
+	printf 'export gvm_go_name; gvm_go_name="%s"\n' "$relocated"
+	printf 'export gvm_pkgset_name; gvm_pkgset_name="global"\n'
+	printf 'export GOROOT; GOROOT="$GVM_ROOT/gos/%s"\n' "$relocated"
+	printf 'export GOPATH; GOPATH="$GVM_ROOT/pkgsets/%s/global"\n' "$relocated"
+	printf 'export PATH; PATH="$GVM_ROOT/gos/%s/bin:$GVM_ROOT/bin:$PATH"\n' "$relocated"
+} > "$GVM_ROOT/environments/$relocated"
+expected_root="$GVM_ROOT"
+gvm use "$relocated" --quiet
+assert_equal "gvm use keeps the caller's GVM_ROOT" "$expected_root" "$GVM_ROOT"
+assert_equal "gvm use resolves GOROOT against the caller's GVM_ROOT" "$expected_root/gos/$relocated" "$GOROOT"
+gvm use "$version" --quiet
 
 # pkgset
 gvm pkgset create "$pkgset" > /dev/null

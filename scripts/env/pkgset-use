@@ -204,7 +204,8 @@ gvm_pkgset_use() {
         fi
 
         gvm_export_path
-        . "$local_pkgset/environments/$fuzzy_match" ||
+        # gvm_source_environment keeps the caller's GVM_ROOT (issue #28)
+        gvm_source_environment "$local_pkgset/environments/$fuzzy_match" ||
             display_error "Failed to source the package set environment" || return 1
 
         # fix PATH to correct order
@@ -239,7 +240,7 @@ gvm_pkgset_use() {
         fi
 
         gvm_export_path
-        . "$GVM_ROOT/environments/$fuzzy_match" ||
+        gvm_source_environment "$GVM_ROOT/environments/$fuzzy_match" ||
             display_error "Failed to source the package set environment" || return 1
 
         # fix PATH to correct order

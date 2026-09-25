@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# gvm_source_environment()
+# /*!
+# @abstract Source an environment file without letting it change GVM_ROOT
+# @discussion
+# Every environment file starts with the GVM_ROOT that was current when it
+#   was written, so that it can be sourced on its own. When gvm itself
+#   sources one, GVM_ROOT is already set by the caller, and the file's copy
+#   of it is stale as soon as the root is relocated or the user points
+#   GVM_ROOT elsewhere: `gvm use` then silently reverted GVM_ROOT to the
+#   install-time path, and GOROOT, GOPATH and PATH followed (issue #28).
+#
+# The file is read with the shell's own read builtin, its GVM_ROOT
+#   assignment is left out, and the rest is evaluated as one block, so that
+#   every path in it expands against the caller's GVM_ROOT. A pkgset
+#   environment sources its version environment with a plain `.`; that line
+#   is routed through this function as well, since the version environment
+#   carries the same assignment. Nothing forks, so this is no slower than
+#   the `.` it replaces on the `gvm use` path, and multi-line constructs
+#   added by hand through `gvm pkgenv` are evaluated exactly as `.` would.
+# @param filepath Path to the environment file
+# @return Returns the status of the evaluated file, or failure (status 1) if
+#   the file cannot be read.
+# */
+function gvm_source_environment() {
+	local __gvm_env_file="${1}"
+	local __gvm_env_line __gvm_env_script=""
+
+	[[ -n "${__gvm_env_file}" && -r "${__gvm_env_file}" ]] || return 1
+
+	while IFS= read -r __gvm_env_line || [[ -n "${__gvm_env_line}" ]]; do
+		case "${__gvm_env_line}" in
+			"export GVM_ROOT; GVM_ROOT="*|"export GVM_ROOT="*|"GVM_ROOT="*)
+				# the caller's GVM_ROOT stays in force
+				continue ;;
+			". "*|"source "*)
+				# a nested environment file gets the same treatment
+				__gvm_env_line="gvm_source_environment ${__gvm_env_line#* }" ;;
+		esac
+		__gvm_env_script="${__gvm_env_script}${__gvm_env_line}"$'\n'
+	done < "${__gvm_env_file}"
+
+	eval "${__gvm_env_script}"
+}
