@@ -129,8 +129,15 @@ cd() {
         echo "Resolved default pkgset: ${defaults_go_pkgset:-[EMPTY]}"
     fi
 
-    __gvmp_find_closest_dot_go_version
-    rslt=$?
+    # Both files are looked up in one walk, so that the version switch below
+    # can tell whether the shell is already in the state the two files ask
+    # for. The pkgset is applied after the version, as before.
+    local use_gopkgset="" pkgset_rslt=1
+    __gvmp_find_dot_files
+    rslt=1
+    [[ -n "${dot_go_version}" ]] && rslt=0
+    [[ -n "${dot_go_pkgset}" ]] && pkgset_rslt=0
+    [[ ${pkgset_rslt} -eq 0 ]] && __gvmp_read_dot_go_pkgset "${dot_go_pkgset}"
 
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "---------------------------------------"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_version => $dot_go_version"
@@ -139,10 +146,20 @@ cd() {
 
     if [[ $rslt -eq 0 ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found dot_go_version: ${dot_go_version}"
-        local use_goversion="$(__gvmp_read_dot_go_version "${dot_go_version}")"
+        local use_goversion=""
+        __gvmp_read_dot_go_version "${dot_go_version}"
         if [[ -n "${use_goversion}" ]]; then
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
-            gvm use "${use_goversion}" || return 1
+            # The file is found from every directory below it (issue #11), so
+            # this branch runs on each cd inside a project. `gvm use` forks
+            # dozens of processes and leaves the shell on the version's global
+            # pkgset, or on the one .go-pkgset names once that is applied
+            # below; when that is already the state, there is nothing to do.
+            if [[ "${use_goversion}" == "${gvm_go_name}" && "${gvm_pkgset_name}" == "${use_gopkgset:-global}" ]]; then
+                [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Already using: ${use_goversion}"
+            else
+                [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
+                gvm use "${use_goversion}" || return 1
+            fi
         else
             # The file holds nothing that reads as a version. The directory
             # change itself has already succeeded, so this is not a cd()
@@ -168,16 +185,18 @@ cd() {
         return 0
     fi
 
-    __gvmp_find_closest_dot_go_pkgset
-    rslt=$?
+    rslt=${pkgset_rslt}
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_pkgset => $dot_go_pkgset"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
     if [[ $rslt -eq 0 ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found .go-pkgset: ${dot_go_pkgset}"
-        local use_gopkgset="$(__gvmp_read_dot_go_pkgset "${dot_go_pkgset}")"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_gopkgset}"
-        gvm pkgset use "${use_gopkgset}" || return 1
+        if [[ -n "${use_gopkgset}" && "${use_gopkgset}" == "${gvm_pkgset_name}" ]]; then
+            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Already using pkgset: ${use_gopkgset}"
+        else
+            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_gopkgset}"
+            gvm pkgset use "${use_gopkgset}" || return 1
+        fi
         unset use_gopkgset
     elif [[ -n "${defaults_go_pkgset}" ]];then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-pkgset found. Using system or default pkgset."
@@ -200,19 +219,18 @@ cd() {
 #   skipped, and only lines of the form 'export VAR; VAR="VALUE"' count, the
 #   last occurrence of a key winning. The values are assigned to the caller's
 #   defaults_go_name and defaults_go_pkgset variables.
+#
+# The lines are matched with case patterns rather than a regex: on every cd
+#   this is the single largest cost, and a regex match per line ran at about
+#   six times the cost of the patterns, before the setopt/unsetopt calls the
+#   regex needed under zsh.
 # @param path Path to environment file
 # @return Returns success (status 0) if at least one line was parsed, or
 #   failure (status 1) if the file is unreadable or contains no parseable line.
 # */
 __gvmp_read_defaults() {
-    if [[ -n $ZSH_VERSION ]]; then
-        setopt KSH_ARRAYS
-        setopt BASH_REMATCH
-    fi
-
     local filepath="${1}"
-    local regex='^export ([^[:digit:]]+[[:alnum:]_]+);[[:space:]]*([^[:digit:]]+[[:alnum:]_]+=(.*))$'
-    local _line __key __val
+    local _line __val
     local parsed=false
 
     defaults_go_name=""
@@ -220,117 +238,146 @@ __gvmp_read_defaults() {
 
     if [[ -n "${filepath}" && -r "${filepath}" ]]; then
         while IFS=$'\n' read -r _line || [[ -n "${_line}" ]]; do
-            # skip comment lines
-            [[ "${_line}" == *"#"* ]] && continue
-
-            if [[ "${_line}" =~ ${regex} ]]; then
-                __key="${BASH_REMATCH[1]}"
-                __val="${BASH_REMATCH[3]}"
-                # strip leading and trailing quotes
-                __val="${__val#\"}"; __val="${__val%\"}"
-                case "${__key}" in
-                    gvm_go_name) defaults_go_name="${__val}" ;;
-                    gvm_pkgset_name) defaults_go_pkgset="${__val}" ;;
-                esac
-                parsed=true
-            fi
+            case "${_line}" in
+                # skip comment lines
+                *"#"*) continue ;;
+                "export gvm_go_name;"*"gvm_go_name="*)
+                    # strip leading and trailing quotes
+                    __val="${_line#*gvm_go_name=}"; __val="${__val#\"}"
+                    defaults_go_name="${__val%\"}"
+                    parsed=true ;;
+                "export gvm_pkgset_name;"*"gvm_pkgset_name="*)
+                    __val="${_line#*gvm_pkgset_name=}"; __val="${__val#\"}"
+                    defaults_go_pkgset="${__val%\"}"
+                    parsed=true ;;
+                "export "*";"*"="*)
+                    parsed=true ;;
+            esac
         done < "${filepath}"
-    fi
-
-    if [[ -n $ZSH_VERSION ]]; then
-        unsetopt KSH_ARRAYS
-        unsetopt BASH_REMATCH
     fi
 
     [[ "${parsed}" == true ]]
 }
 
-# __gvmp_find_closest_dot_go_version()
+# __gvmp_find_dot_files()
 # /*!
-# @abstract Locate the .go-version file that applies to the current directory
+# @abstract Locate the .go-version and .go-pkgset files that apply to the
+#   current directory
 # @discussion
-# Assigns the path to the caller's dot_go_version variable (empty when none is
-#   found). Like __gvm_find_path_upwards, only $PWD itself is checked at the
-#   moment. Uses builtins only so that cd() does not fork.
-# @return Returns success (status 0) if found or failure (status 1).
+# Assigns the paths to the caller's dot_go_version and dot_go_pkgset variables
+#   (empty when none is found). Each file is looked for in $PWD and then in
+#   every parent directory up to $HOME or /, so a file at the root of a
+#   project applies everywhere inside it (issue #11); the two are found
+#   independently, the nearest instance of each winning. This runs on every
+#   cd, so it is one walk over the path with parameter expansion and file
+#   tests only: no forks, and no second pass for the second file.
+# @return Returns success (status 0) if at least one file was found or failure
+#   (status 1).
 # */
-__gvmp_find_closest_dot_go_version() {
+__gvmp_find_dot_files() {
+    local current_dir="${PWD}"
+    local highest_dir="${HOME%/}"
+
     dot_go_version=""
-    [[ -f "${PWD}/.go-version" ]] || return 1
-    dot_go_version="${PWD}/.go-version"
-    return 0
-}
-
-# __gvmp_find_closest_dot_go_pkgset()
-# /*!
-# @abstract Locate the .go-pkgset file that applies to the current directory
-# @discussion
-# Assigns the path to the caller's dot_go_pkgset variable (empty when none is
-#   found). Like __gvm_find_path_upwards, only $PWD itself is checked at the
-#   moment. Uses builtins only so that cd() does not fork.
-# @return Returns success (status 0) if found or failure (status 1).
-# */
-__gvmp_find_closest_dot_go_pkgset() {
     dot_go_pkgset=""
-    [[ -f "${PWD}/.go-pkgset" ]] || return 1
-    dot_go_pkgset="${PWD}/.go-pkgset"
-    return 0
+
+    # One file test per level in the usual case where neither file is there.
+    # The loop stops at highest_dir, or at "" once "${current_dir%/*}" has
+    # consumed the last component; the directory it stops at is checked
+    # after the loop, so highest_dir is included and "" reads the root
+    # directory as "/.go-version".
+    while [[ -n "${current_dir}" && "${current_dir}" != "${highest_dir}" ]]; do
+        if [[ -f "${current_dir}/.go-version" || -f "${current_dir}/.go-pkgset" ]]; then
+            [[ -z "${dot_go_version}" && -f "${current_dir}/.go-version" ]] && dot_go_version="${current_dir}/.go-version"
+            [[ -z "${dot_go_pkgset}" && -f "${current_dir}/.go-pkgset" ]] && dot_go_pkgset="${current_dir}/.go-pkgset"
+            [[ -n "${dot_go_version}" && -n "${dot_go_pkgset}" ]] && return 0
+        fi
+        current_dir="${current_dir%/*}"
+    done
+    [[ -z "${dot_go_version}" && -f "${current_dir}/.go-version" ]] && dot_go_version="${current_dir}/.go-version"
+    [[ -z "${dot_go_pkgset}" && -f "${current_dir}/.go-pkgset" ]] && dot_go_pkgset="${current_dir}/.go-pkgset"
+
+    [[ -n "${dot_go_version}" || -n "${dot_go_pkgset}" ]]
 }
 
+# __gvmp_read_dot_go_version()
+# /*!
+# @abstract Read the go version named in a .go-version file
+# @discussion
+# Assigns the version to the caller's use_goversion variable (empty when the
+#   file holds none). The file is read with the shell's own read builtin and
+#   the result is assigned, not printed: with the file found from every
+#   directory of a project this runs on each cd inside one, and the previous
+#   `$(cat file)` cost two forks per call.
+# @param filepath Path to the .go-version file
+# @return Returns success (status 0) if a version was found or failure (status 1).
+# */
 __gvmp_read_dot_go_version() {
     local filepath="${1}"
-    local version=""
+    local _line
     local regex='^(go([0-9]+(\.[0-9]+)*))$'
     # goenv, asdf and the go.mod toolchain directive write the version without
     # the "go" prefix; that form is accepted and named the way `gvm install`
     # names it (issue #10).
     local bare_regex='^([0-9]+(\.[0-9]+)*)$'
 
-    while IFS=$'\n' read -r _line; do
+    use_goversion=""
+
+    [[ -r "${filepath}" ]] || return 1
+
+    while IFS=$'\n' read -r _line || [[ -n "${_line}" ]]; do
         # skip comment lines
         [[ "${_line}" =~ \#.* ]] && continue
 
         # looking for pattern "go1.2[.3]"
         if [[ "${_line}" =~ ${regex} ]]; then
-            version="${_line}"
+            use_goversion="${_line}"
             break
         fi
         # or the bare "1.2[.3]"
         if [[ "${_line}" =~ ${bare_regex} ]]; then
-            version="go${_line}"
+            use_goversion="go${_line}"
             break
         fi
-    done <<< "$(cat "${filepath}")"
+    done < "${filepath}"
 
-    echo "${version}"
-
-    if [[ -z "${version}" ]]; then
+    if [[ -z "${use_goversion}" ]]; then
         return 1
     fi
 
     return 0
 }
 
+# __gvmp_read_dot_go_pkgset()
+# /*!
+# @abstract Read the pkgset named in a .go-pkgset file
+# @discussion
+# Assigns the pkgset to the caller's use_gopkgset variable (empty when the
+#   file holds none). Read with builtins only, like __gvmp_read_dot_go_version.
+# @param filepath Path to the .go-pkgset file
+# @return Returns success (status 0) if a pkgset was found or failure (status 1).
+# */
 __gvmp_read_dot_go_pkgset() {
-
     local filepath="${1}"
-    local pkgset=""
+    local _line
     local regex='^([A-Za-z0-9._#:%\+\-]+)$'
 
-    while IFS=$'\n' read -r _line; do
+    use_gopkgset=""
+
+    [[ -r "${filepath}" ]] || return 1
+
+    while IFS=$'\n' read -r _line || [[ -n "${_line}" ]]; do
         # skip comment lines
         [[ "${_line}" =~ \#.* ]] && continue
 
         # fairly loose naming convention, exclude @ symbol
         if [[ "${_line}" =~ ${regex} ]]; then
-            pkgset="${_line}"
+            use_gopkgset="${_line}"
             break
         fi
-    done <<< "$(cat "${filepath}")"
+    done < "${filepath}"
 
-    echo "${pkgset}"
-
-    if [[ -z "${pkgset}" ]]; then
+    if [[ -z "${use_gopkgset}" ]]; then
         return 1
     fi
 

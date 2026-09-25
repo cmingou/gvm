@@ -45,6 +45,7 @@ Features
 * List added/removed files in GOROOT with `gvm diff`
 * Manage GOPATHs with `gvm pkgset [create/use/delete] [name]`. Use `--local` as `name` to manage repository under local path (`/path/to/repo/.gvm_local`).
   A package set's environment sources the environment of its Go version, so an edit made with a bare `gvm pkgenv` applies to every package set created from that version.
+* Switch automatically on `cd`: a `.go-version` file (`go1.22.6`, or the bare `1.22.6` that goenv and asdf write) and an optional `.go-pkgset` file at the root of a project apply from every directory inside it.
 * List latest release tags with `gvm listall`. Use `--all` to list weekly as well.
 * Cache a clean copy of the latest Go source for multiple version installs.
 * Link project directories into GOPATH

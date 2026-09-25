@@ -4,9 +4,11 @@
 # /*!
 # @abstract Search upwards through the directory tree for a target file or
 #   directory and return the path to the first instance found
-# @discussione
+# @discussion
 # Searches upwards through the directory tree starting at start_dir for a target
-#   file or directory basename.
+#   file or directory basename. Every directory from start_dir up to and
+#   including final_dir is checked; the search also stops at the root of the
+#   file system.
 # @param target Basename of file or directory to find
 # @param start_dir [optional] Path to starting directory of search, defaults to
 #   present working directory.
@@ -20,6 +22,7 @@ __gvm_find_path_upwards() {
     local target="${1}"
     local start_dir="${2:-$PWD}"
     local final_dir="${3:-$HOME}"
+    local __gvmp_found_path=""
 
     if [[ \
         "x${target}" == "x" || \
@@ -30,68 +33,69 @@ __gvm_find_path_upwards() {
         echo "" && return 1
     fi
 
-    local found_file="$(__gvmp_find_current_path_for_target "${target}")"
-    echo "${found_file}"
+    __gvmp_find_path_for_target "${target}" "${start_dir}" "${final_dir}"
+    echo "${__gvmp_found_path}"
 
-    if [[ -z "${found_file}" ]]; then
+    if [[ -z "${__gvmp_found_path}" ]]; then
         return 1
     fi
 
     return 0
 }
 
+# __gvmp_find_path_for_target()
+# /*!
+# @abstract Walk up the directory tree looking for a target, without forking
+# @discussion
+# The walk is done with parameter expansion and file tests only: cd() runs it
+#   on every directory change, so it must not fork. The result is assigned to
+#   the caller's __gvmp_found_path variable rather than printed, so that the
+#   caller does not need a command substitution to read it (issue #11).
+# @param target Basename of file or directory to find
+# @param start_dir Path to starting directory of search; "~" and "." are
+#   resolved, a relative path is taken relative to $PWD
+# @param final_dir Highest directory that will be checked
+# @return Returns success (status 0) if the target was found, with its path in
+#   __gvmp_found_path, or failure (status 1) with __gvmp_found_path empty.
+# */
 __gvmp_find_path_for_target() {
     local target="${1}"
-    local start_dir="${2}"
-    local final_dir="${3}"
+    local current_dir="${2}"
+    local highest_dir="${3}"
+    local candidate=""
 
-    if [[ ${#target} -eq 0 ]]; then
-        echo ""; return 1
-    fi
+    __gvmp_found_path=""
 
-    # resolve tilde for HOME
-    start_dir="${start_dir/#\~/$HOME}"
-
-    # resolve dot for PWD
-    if [[ "${start_dir}" == "." ]]; then
-        start_dir="$PWD"
-    fi
-
-    local current_dir="${start_dir}"
-    local highest_dir="${final_dir}"
-
-    builtin cd "${current_dir}"
-    while [[ "${current_dir}" != "${highest_dir}" && "${current_dir}" != "/" ]]; do
-        if [[ -f "${current_dir}/${target}" ||  -d "${current_dir}/${target}" ]]; then
-            echo "${current_dir}/${target}"; return 0
-            break
-        fi
-
-        builtin cd ..
-        current_dir="$(pwd)"
-    done
-
-    echo "";
-    return 1
-}
-
-
-__gvmp_find_current_path_for_target() {
-    local target="${1}"
-    local start_dir="$PWD"
-
-    if [[ ${#target} -eq 0 ]]; then
-        echo "";
+    if [[ ${#target} -eq 0 || ${#current_dir} -eq 0 ]]; then
         return 1
     fi
 
-    local current_dir="${start_dir}"
+    case "${current_dir}" in
+        "~") current_dir="${HOME}" ;;
+        "~/"*) current_dir="${HOME}${current_dir#\~}" ;;
+        ".") current_dir="${PWD}" ;;
+        /*) ;;
+        *) current_dir="${PWD}/${current_dir}" ;;
+    esac
 
-    if [[ -f "${current_dir}/${target}" ]]; then
-        echo "${current_dir}/${target}";
-        return 0
-    fi
+    # a trailing slash would make the comparison with highest_dir fail; the
+    # root directory itself is spelled "/" again below.
+    highest_dir="${highest_dir%/}"
 
-    echo "";
-    return 1
+    while :; do
+        current_dir="${current_dir%/}"
+        [[ -z "${current_dir}" ]] && current_dir="/"
+
+        candidate="${current_dir%/}/${target}"
+        if [[ -f "${candidate}" || -d "${candidate}" ]]; then
+            __gvmp_found_path="${candidate}"
+            return 0
+        fi
+
+        if [[ "${current_dir}" == "/" || "${current_dir}" == "${highest_dir}" ]]; then
+            return 1
+        fi
+
+        current_dir="${current_dir%/*}"
+    done
 }
