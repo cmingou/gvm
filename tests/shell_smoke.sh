@@ -90,6 +90,16 @@ cd "$workdir/versioned" > /dev/null
 assert_equal "cd auto-switches the version" "$version" "$gvm_go_name"
 assert_equal "cd auto-switches the pkgset" "$pkgset" "$gvm_pkgset_name"
 
+# the dot files at the root of a project apply from every directory inside
+# it, and moving around inside the project must not switch again (issue #11)
+mkdir -p "$workdir/versioned/cmd/sub"
+gvm use "$version" --quiet
+cd "$workdir/plain"
+cd "$workdir/versioned/cmd/sub" > /dev/null
+assert_equal "cd into a subdirectory applies the project's .go-version" "$version" "$gvm_go_name"
+assert_equal "cd into a subdirectory applies the project's .go-pkgset" "$pkgset" "$gvm_pkgset_name"
+assert_equal "cd inside the project does not switch again" "" "$(cd "$workdir/versioned/cmd")"
+
 # a failing cd must report failure and must not move (issue #6, issue #8)
 cd "$workdir/does-not-exist" 2> /dev/null
 rslt=$?
