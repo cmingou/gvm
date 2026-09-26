@@ -21,30 +21,96 @@
 # @/textblock</pre>
 #   From the list of names that conform to the above pattern, the name with the
 #   highest version number will be selected.
+#
+#   The installed versions are read straight from $GVM_ROOT/gos with a glob and
+#   compared with shell builtins. This used to run `gvm list` inside a command
+#   substitution: a child shell that reloads every function file, then a
+#   pipeline of ls and sed, about 250ms on a macOS runner, paid on the first cd
+#   of every shell whose root has no default or system environment (issue #5).
+#   Reading the listing also picked the last name in ls order, which is
+#   lexicographic, so go1.9 won over go1.10; the comparison is numeric now, as
+#   documented above.
 # @return Returns a string containing the fallback version name (status 0) or an
 #   empty string (status 1) on failure.
 # */
 
 __gvm_resolve_fallback_version() {
-    local version=""
-    local regex='^([[:space:]]*[=>*]*[[:space:]]+)(go([0-9]+(\.[0-9]+)*))$'
+    __gvmp_resolve_fallback_version
 
-    while IFS=$'\n' read -r _line; do
-        if __gvm_rematch "${_line}" "${regex}"
-        then
-            # GVM_REMATCH[1]: indicator (e.g. ' ', '*', '=>', '=*')
-            # GVM_REMATCH[2]: version name (e.g. go1.7.1)
-            # GVM_REMATCH[3]: isolated version (e.g. 1.7.1)
-            version="${GVM_REMATCH[2]}"
-        fi
-    done <<< "$(\gvm list --porcelain)"
+    echo "${__gvmp_resolved_version}"
 
-    echo "${version}"
-
-    if [[ -z "${version}" ]]
+    if [[ -z "${__gvmp_resolved_version}" ]]
     then
         return 1
     fi
 
     return 0
+}
+
+# __gvmp_resolve_fallback_version()
+# /*!
+# @abstract Fork-free core of __gvm_resolve_fallback_version
+# @discussion
+# Assigns the fallback version name to __gvmp_resolved_version (empty when
+#   there is none) instead of printing it, so that cd() can call it without
+#   the command substitution, and the fork, that reading its output costs.
+# @return Returns success (status 0) if a version was found or failure (status 1).
+# */
+__gvmp_resolve_fallback_version() {
+    local regex='^(go([0-9]+(\.[0-9]+)*))$'
+    local _dir _name _number
+    local best_number=""
+
+    __gvmp_resolved_version=""
+
+    # zsh aborts a for loop over a glob that matches nothing; bash leaves the
+    # pattern in place, which the directory test below rejects.
+    [[ -n $ZSH_VERSION ]] && setopt local_options null_glob
+
+    for _dir in "${GVM_ROOT}/gos"/go*/; do
+        [[ -d "${_dir}" ]] || continue
+        _name="${_dir%/}"
+        _name="${_name##*/}"
+        # only the whole match is used, never a numbered group: with KSH_ARRAYS
+        # off again after __gvm_rematch returns, zsh numbers the rematch array
+        # from 1 where bash numbers it from 0, so group indexes differ.
+        __gvm_rematch "${_name}" "${regex}" || continue
+        _number="${_name#go}"
+        if [[ -z "${best_number}" ]] || __gvmp_version_greater "${_number}" "${best_number}"
+        then
+            __gvmp_resolved_version="${_name}"
+            best_number="${_number}"
+        fi
+    done
+
+    [[ -n "${__gvmp_resolved_version}" ]]
+}
+
+# __gvmp_version_greater()
+# /*!
+# @abstract Compare two dotted version numbers
+# @discussion
+# Fields are compared numerically from the left; a missing field counts as 0,
+#   so 1.7 and 1.7.0 are equal. Written without arrays, which bash and zsh
+#   index differently, and without forks.
+# @param a First version number (e.g. 1.7.1)
+# @param b Second version number (e.g. 1.7)
+# @return Returns success (status 0) if a is greater than b, otherwise failure
+#   (status 1).
+# */
+__gvmp_version_greater() {
+    local a="${1}" b="${2}"
+    local x y
+
+    while [[ -n "${a}" || -n "${b}" ]]; do
+        x="${a%%.*}"
+        y="${b%%.*}"
+        if [[ "${a}" == *.* ]]; then a="${a#*.}"; else a=""; fi
+        if [[ "${b}" == *.* ]]; then b="${b#*.}"; else b=""; fi
+        # base 10, so that a leading zero is not read as octal
+        (( 10#${x:-0} > 10#${y:-0} )) && return 0
+        (( 10#${x:-0} < 10#${y:-0} )) && return 1
+    done
+
+    return 1
 }

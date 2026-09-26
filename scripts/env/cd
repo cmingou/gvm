@@ -88,16 +88,20 @@ cd() {
         # Neither a default nor a system environment file exists -- the state a
         # gvm install leaves behind when the machine has no go on PATH.
         #
-        # Resolving a fallback runs `gvm list` inside a command substitution,
-        # which forks several subshells. Doing that on every cd is the same
-        # fork-per-cd problem as issue #1, just in the branch that fix did not
-        # cover: on a macOS runner it costs ~325ms per cd (issue #49). The
-        # answer only changes when the set of installed versions changes, so it
-        # is resolved once per shell; gvm() clears the cache, and every command
-        # that installs, removes or switches a version goes through gvm().
+        # The fallback used to be resolved by running `gvm list` inside a
+        # command substitution, which forks several subshells. Doing that on
+        # every cd is the same fork-per-cd problem as issue #1, just in the
+        # branch that fix did not cover: on a macOS runner it cost ~325ms per
+        # cd (issue #49). The resolver now reads $GVM_ROOT/gos with builtins
+        # and assigns its result instead of printing it (issue #5), so this
+        # branch forks nothing at all. The answer only changes when the set of
+        # installed versions changes, so it is still resolved once per shell;
+        # gvm() clears the cache, and every command that installs, removes or
+        # switches a version goes through gvm().
         if [[ "${__gvmp_fallback_cached}" != true ]]; then
             [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolving fallback go version from all available."
-            __gvmp_fallback_go_name="$(__gvm_resolve_fallback_version)"
+            __gvmp_resolve_fallback_version
+            __gvmp_fallback_go_name="${__gvmp_resolved_version}"
             __gvmp_fallback_cached=true
         fi
         defaults_go_name="${__gvmp_fallback_go_name}"
@@ -107,9 +111,10 @@ cd() {
         # that would have consumed it is commented out -- and unlike the
         # version it depends on $PWD, so it cannot be cached across
         # directories. Anything that starts using defaults_go_pkgset for real
-        # has to resolve it here again, and pay for it.
+        # has to resolve it here again.
         if [[ "${GVM_DEBUG}" -eq 1 ]]; then
-            defaults_go_pkgset="$(__gvm_resolve_fallback_pkgset "${defaults_go_name}")"
+            __gvmp_resolve_fallback_pkgset "${defaults_go_name}"
+            defaults_go_pkgset="${__gvmp_resolved_pkgset}"
         fi
 
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "======================================="

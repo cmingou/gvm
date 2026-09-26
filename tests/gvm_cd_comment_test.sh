@@ -33,16 +33,18 @@ pwd # match=/tmp-cdtest\/versioned$/
 ## system environment file exists, so both are moved aside for this part.
 mv $GVM_ROOT/environments/default $GVM_ROOT/environments/default.cdtestbak 2> /dev/null; true # status=0
 mv $GVM_ROOT/environments/system $GVM_ROOT/environments/system.cdtestbak 2> /dev/null; true # status=0
-## The counter is a file: cd() calls the resolver inside a command
-## substitution, so a variable incremented there would not survive the subshell.
+## The counter is a file, so that it also holds if the resolver is ever called
+## inside a command substitution again, where an incremented variable would not
+## survive the subshell. cd() calls the resolver's fork-free core, which assigns
+## its result instead of printing it (issue 5).
 rm -f $GVM_ROOT/tmp-cdtest/calls # status=0
-__gvm_resolve_fallback_version() { echo call >> "$GVM_ROOT/tmp-cdtest/calls"; echo "go0.0.3"; }
+__gvmp_resolve_fallback_version() { echo call >> "$GVM_ROOT/tmp-cdtest/calls"; __gvmp_resolved_version="go0.0.3"; }
 cd $GVM_ROOT/tmp-cdtest/plain # status=0
 cd $GVM_ROOT # status=0
 cd $GVM_ROOT/tmp-cdtest/plain # status=0
 cd $GVM_ROOT # status=0
 echo $(wc -l < $GVM_ROOT/tmp-cdtest/calls) # match=/^1$/
-unset -f __gvm_resolve_fallback_version
+unset -f __gvmp_resolve_fallback_version
 rm -f $GVM_ROOT/tmp-cdtest/calls # status=0
 mv $GVM_ROOT/environments/default.cdtestbak $GVM_ROOT/environments/default 2> /dev/null; true # status=0
 mv $GVM_ROOT/environments/system.cdtestbak $GVM_ROOT/environments/system 2> /dev/null; true # status=0
