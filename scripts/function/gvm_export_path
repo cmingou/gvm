@@ -1,19 +1,46 @@
 #!/usr/bin/env bash
-function gvm_export_path() {
-	# The tool paths are set by scripts/function/tools, which is sourced into
-	# the shell but does not reach an environment that carries gvm's functions
-	# without its unexported variables. Without them the pipeline below
-	# collapsed to "$GVM_ROOT/bin:" and PATH was wiped with exit status 0
-	# (issue #15). Reload them, and refuse rather than touch PATH when that
-	# does not help.
-	if [[ -z "$TR_PATH" || -z "$GREP_PATH" || -z "$EGREP_PATH" || -z "$SED_PATH" ]]; then
-		. "$GVM_ROOT/scripts/function/tools" > /dev/null 2>&1
-	fi
-	if [[ -z "$TR_PATH" || -z "$GREP_PATH" || -z "$EGREP_PATH" || -z "$SED_PATH" ]]; then
-		display_error "Could not find the tools gvm needs (tr, grep, egrep, sed). PATH left unchanged."
-		return 1
-	fi
 
-	export PATH="$GVM_ROOT/bin:$(echo "$PATH" | $TR_PATH ":" "\n" | "$GREP_PATH" -v '^$' | $EGREP_PATH -v "$GVM_ROOT/(pkgsets|gos|bin)" | $TR_PATH "\n" ":" | $SED_PATH 's/:*$//')"
+# gvm_export_path()
+# /*!
+# @abstract Rebuild PATH with gvm's bin first and every gvm entry removed
+# @discussion
+# Splits PATH on ':' with parameter expansion, drops empty entries and every
+#   entry that contains $GVM_ROOT/pkgsets, $GVM_ROOT/gos or $GVM_ROOT/bin, and
+#   puts $GVM_ROOT/bin in front of what is left. The result is also recorded in
+#   GVM_PATH_BACKUP.
+#
+# This used to be a pipeline of tr, grep -v, egrep -v, tr and sed inside a
+#   command substitution: five forks on every `gvm use`, every `gvm pkgset use`
+#   and every login, and the only place gvm ran egrep, which GNU grep 3.8 and
+#   later answers with an "egrep is obsolescent" warning on stderr that the
+#   command substitution let through to the terminal, and which some systems
+#   no longer ship at all (issue #16). Nothing forks now, so there is no tool
+#   to look up first and no pipeline that could collapse and wipe PATH when a
+#   tool path is unset (issue #15). The entries are matched with quoted case
+#   patterns, which bash 3.2, bash 5 and zsh all take literally; the old
+#   egrep pattern was unanchored, so an entry is dropped wherever the gvm
+#   directory appears in it, as before.
+# @return Returns success (status 0).
+# */
+function gvm_export_path() {
+	local __gvm_rest="${PATH}"
+	local __gvm_entry=""
+	local __gvm_path_out=""
+
+	while [[ -n "${__gvm_rest}" ]]; do
+		__gvm_entry="${__gvm_rest%%:*}"
+		if [[ "${__gvm_rest}" == *:* ]]; then
+			__gvm_rest="${__gvm_rest#*:}"
+		else
+			__gvm_rest=""
+		fi
+		case "${__gvm_entry}" in
+			""|*"${GVM_ROOT}/pkgsets"*|*"${GVM_ROOT}/gos"*|*"${GVM_ROOT}/bin"*)
+				continue ;;
+		esac
+		__gvm_path_out="${__gvm_path_out:+${__gvm_path_out}:}${__gvm_entry}"
+	done
+
+	export PATH="$GVM_ROOT/bin${__gvm_path_out:+:${__gvm_path_out}}"
 	export GVM_PATH_BACKUP="$PATH"
 }
