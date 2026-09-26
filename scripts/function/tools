@@ -3,7 +3,6 @@ LS_ERROR="GVM couldn't find ls"
 TR_ERROR="GVM couldn't find tr"
 SED_ERROR="GVM couldn't find sed"
 GREP_ERROR="GVM couldn't find grep"
-EGREP_ERROR="GVM couldn't find egrep"
 SORT_ERROR="GVM couldn't find sort"
 HEAD_ERROR="GVM couldn't find head"
 
@@ -51,12 +50,15 @@ __gvm_locate_tool ls && LS_PATH="${__gvm_tool_path}" || display_error "$LS_ERROR
 __gvm_locate_tool tr && TR_PATH="${__gvm_tool_path}" || display_error "$TR_ERROR" || return 1
 __gvm_locate_tool sed && SED_PATH="${__gvm_tool_path}" || display_error "$SED_ERROR" || return 1
 __gvm_locate_tool grep && GREP_PATH="${__gvm_tool_path}" || display_error "$GREP_ERROR" || return 1
-__gvm_locate_tool egrep && EGREP_PATH="${__gvm_tool_path}" || display_error "$EGREP_ERROR" || return 1
 __gvm_locate_tool sort && SORT_PATH="${__gvm_tool_path}" || display_error "$SORT_ERROR" || return 1
 __gvm_locate_tool head && HEAD_PATH="${__gvm_tool_path}" || display_error "$HEAD_ERROR" || return 1
 
-# Exported so that the functions consuming them (gvm_export_path, gvm use,
-# gvm pkgset use) still find them in an environment that carries gvm's
+# egrep is deliberately not on this list: gvm_export_path was its only user
+# and no longer runs any tool, and a missing egrep used to abort this file
+# before SORT_PATH and HEAD_PATH were set (issue #16).
+#
+# Exported so that the functions consuming them (gvm use, gvm pkgset use)
+# still find them in an environment that carries gvm's
 # functions but not the shell's unexported variables (issue #15). Kept apart
 # from the assignments above: `export VAR=$(cmd)` would hide cmd's status.
-export LS_PATH TR_PATH SED_PATH GREP_PATH EGREP_PATH SORT_PATH HEAD_PATH
+export LS_PATH TR_PATH SED_PATH GREP_PATH SORT_PATH HEAD_PATH
