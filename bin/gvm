@@ -19,8 +19,13 @@ fi
 
 command=$1
 if [[ $command == "implode" ]]; then
-  gvm_implode
-	exit 0
+	# gvm_implode lives in scripts/env/implode, which scripts/functions does
+	# not load: only the gvm() shell function sourced it before calling. Run
+	# as a script, the call failed with "command not found" and the
+	# hardcoded exit 0 reported success while nothing happened (issue #32).
+	. "$GVM_ROOT/scripts/env/implode" || exit 1
+	gvm_implode
+	exit $?
 fi
 
 # The C toolchain that scripts/gvm-check looks for is needed only to compile
