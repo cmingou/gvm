@@ -22,8 +22,13 @@ if [[ $1 == "--local" ]]; then
 	target_top=$LOCAL_TOP/.gvm_local
 	target_set_name="local"
 	target_set_name_str="__local__"
+	# Only the local pkgset goes into GOPATH. The project root used to be
+	# put in front of it, which made every go command warn "ignoring go.mod
+	# in $GOPATH" (a hard error on go1.13 to go1.16) as soon as the project
+	# had a go.mod; local pkgsets predate modules and nothing needs the
+	# project root there (issue #35). The project's bin directory stays on
+	# PATH below.
 	add_gopath="$target_top/pkgsets/$gvm_go_name/$target_set_name"
-	add_gopath="$LOCAL_TOP:$add_gopath"
 	add_path="$target_top/pkgsets/$gvm_go_name/$target_set_name/bin"
 	add_path="$LOCAL_TOP/bin:$add_path"
 	env_root="$target_top"
