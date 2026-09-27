@@ -59,7 +59,16 @@ gvm_use() {
     local goversion_system_regex='^(system(()))$'
     local goversion_master_regex='^(master(()))$'
     # system and master could be handled by alias pattern but it separate for now
-    local goversion_alias_regex='^([a-zA-Z]+(()))$'
+    #
+    # A custom name given to `gvm install --name` can carry digits, dots and
+    # hyphens (test-go1.20). Letters only were accepted here, so any other
+    # custom name fell through to the pkgset pattern, was stored as --pkgset
+    # and `gvm use` gave up with "Please specify the version" (issue #38).
+    # This pattern overlaps with the pkgset pattern, so it is only tried
+    # while no version has been collected yet: a bare name that follows the
+    # version is still a pkgset.
+    local goversion_alias_regex='^([a-zA-Z][A-Za-z0-9._-]*(()))$'
+    local version_seen=false
     # append pkgset_regex to the end of each pattern
     local pkgset_regex='([A-Za-z0-9]+[A-Za-z0-9._#:%\/\+\-]+)'
     local at_pkgset_regex="(@${pkgset_regex})?"
@@ -88,8 +97,11 @@ gvm_use() {
         if __gvm_rematch "${_option}" "${goversion_regex}" ||
            __gvm_rematch "${_option}" "${goversion_release_regex}" ||
            __gvm_rematch "${_option}" "${goversion_system_regex}" ||
-           __gvm_rematch "${_option}" "${goversion_master_regex}" ||
-           __gvm_rematch "${_option}" "${goversion_alias_regex}"
+           __gvm_rematch "${_option}" "${goversion_master_regex}"
+        then
+            version_rematch=true
+        elif [[ "${version_seen}" == false ]] &&
+             __gvm_rematch "${_option}" "${goversion_alias_regex}"
         then
             version_rematch=true
         fi
@@ -100,6 +112,7 @@ gvm_use() {
             # if the regex matches and the accumulator is even, we can add the
             # key/val pair.
             accumulator+=( "--version" "${GVM_REMATCH[1]}" )
+            version_seen=true
             # if pkgset is present, add that to the accumulator as well
             # other --pkgset argument supplied.
             if [[ -n "${GVM_REMATCH[5]}" ]]
@@ -114,6 +127,7 @@ gvm_use() {
             # element in the accumulator must be the option for which this
             # regex matches, we then just add the value.
             accumulator+=( "${GVM_REMATCH[1]}" )
+            version_seen=true
         elif __gvm_rematch "${_option}" "^${pkgset_regex}$" && [[ $(( ${#accumulator[@]}%2 )) -eq 0 ]]
         then
             accumulator+=( "--pkgset" "${GVM_REMATCH[1]}" )
@@ -255,6 +269,7 @@ gvm_use() {
     unset goversion_system_regex
     unset goversion_master_regex
     unset goversion_alias_regex
+    unset version_seen
     unset pkgset_regex
     unset at_pkgset_regex
     unset version_rematch
