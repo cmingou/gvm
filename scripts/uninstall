@@ -9,6 +9,12 @@ fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | $GREP_PATH "$1" | $HEAD
 	display_fatal "Invalid version $1"
 
 if [[ -d $GVM_ROOT/gos/$fuzzy_match ]]; then
+	# Go writes the module cache under GOPATH/pkg/mod read-only (0555
+	# directories, 0444 files), which rm -rf cannot remove as a normal user.
+	# Restore write permission first, so that a version whose pkgsets hold a
+	# module cache can be uninstalled at all (issue #29).
+	[[ ! -d "$GVM_ROOT/pkgsets/$fuzzy_match" ]] ||
+		chmod -R u+w "$GVM_ROOT/pkgsets/$fuzzy_match" &> /dev/null
 	rm -rf "$GVM_ROOT/pkgsets/$fuzzy_match" &> /dev/null ||
 		display_fatal "Couldn't remove pkgsets. Please run 'gvm use $1 && go clean -modcache' and retry uninstall."
 	rm -f "$GVM_ROOT/environments/$fuzzy_match" &> /dev/null ||
