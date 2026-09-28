@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
 . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
 # gvm_pkgset_use()
@@ -30,8 +29,19 @@
 # */
 
 gvm_use() {
-    local options_hash; options_hash=()
+    # The parsed options. They used to be collected in a _bash_pseudo_hash,
+    # whose every write and read is a command substitution around a function
+    # that percent-encodes or decodes the value inside another one: some
+    # thirty forks per `gvm use`, which cd() runs whenever a .go-version
+    # switches the version (issue #2). Four locals need none of that, and
+    # behave the same on bash 3.2, bash 5 and zsh.
+    local opt_version="" opt_pkgset="" opt_default="" opt_quiet=""
     local accumulator; accumulator=()
+    # The flush loop's counter, declared once here: it used to leak out of
+    # `gvm use` as a global i and reset any loop counter of that name in the
+    # calling shell; declared inside the loop, zsh would print it on every
+    # flush after the first (typeset echoes an already-declared local).
+    local i
 
     # Go version regex patterns are specifically implemented to output rematches
     # in a consistent format. Consider the following examples:
@@ -182,7 +192,12 @@ gvm_use() {
                     __val="${accumulator[i+1]}"
                 fi
 
-                options_hash=( $(setValueForKeyFakeAssocArray "${__key}" "${__val}" "${options_hash[*]}") )
+                case "${__key}" in
+                    --version) opt_version="${__val}" ;;
+                    --pkgset)  opt_pkgset="${__val}" ;;
+                    --default) opt_default="${__val}" ;;
+                    --quiet)   opt_quiet="${__val}" ;;
+                esac
                 unset __key __val
             done
             accumulator=()
@@ -193,18 +208,11 @@ gvm_use() {
     if [[ "${GVM_DEBUG}" -eq 1 ]]
     then
         printf "Command (%s) options dump:\n" "${BASH_SOURCE[0]##*/}"
-        local _item
-        for _item in "${options_hash[@]}"
-        do
-            local __key="${_item%%:*}"
-            local __val="$(valueForKeyFakeAssocArray "${__key}" "${options_hash[*]}")"
-            printf "  [%s]: %s\n" "${__key}" "${__val}"
-            unset __key __val
-        done
-        unset _item
+        printf "  [%s]: %s\n" "--version" "${opt_version}" "--pkgset" "${opt_pkgset}" \
+            "--default" "${opt_default}" "--quiet" "${opt_quiet}"
     fi
 
-    local version="$(valueForKeyFakeAssocArray "--version" "${options_hash[*]}")"
+    local version="${opt_version}"
 
     if [[ -z "${version}" ]]
     then
@@ -239,17 +247,17 @@ gvm_use() {
     export PATH="${fixed_path}"
     unset fixed_path
 
-    if [[ -n "$(valueForKeyFakeAssocArray "--default" "${options_hash[*]}")" ]]
+    if [[ -n "${opt_default}" ]]
     then
         cp "$GVM_ROOT/environments/$fuzzy_match" "$GVM_ROOT/environments/default"
         [[ $? -ne 0 ]] && display_error "Couldn't make $fuzzy_match default"
     fi
 
-    local pkgset="$(valueForKeyFakeAssocArray "--pkgset" "${options_hash[*]}")"
+    local pkgset="${opt_pkgset}"
     if [[ -n "${pkgset}" ]]
     then
-        local pkgset_args=( "$(valueForKeyFakeAssocArray "--pkgset" "${options_hash[*]}")" )
-        if [[ -n "$(valueForKeyFakeAssocArray "--default" "${options_hash[*]}")" ]]
+        local pkgset_args=( "${opt_pkgset}" )
+        if [[ -n "${opt_default}" ]]
         then
             pkgset_args+=( "--default" )
         fi
@@ -259,11 +267,10 @@ gvm_use() {
     fi
     unset pkgset
 
-    if [[ -z "$(valueForKeyFakeAssocArray "--quiet" "${options_hash[*]}")" ]]; then
+    if [[ -z "${opt_quiet}" ]]; then
         display_message "Now using version $fuzzy_match"
     fi
 
-    unset options_hash
     unset goversion_regex
     unset goversion_release_regex
     unset goversion_system_regex
