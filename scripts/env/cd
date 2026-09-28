@@ -7,6 +7,27 @@
 . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
 . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
+# cd may already be an alias: zoxide's `alias cd=z`, an `alias cd='cd -P'`,
+# a plugin's. zsh refuses to define a function whose name is an alias, and
+# that is a parse error that aborts the whole source, so gvm did not load at
+# all; bash expands the alias inside the definition instead, so the function
+# was defined under the alias's own name, over whatever that was, and cd
+# stayed the alias (issue #9). The alias is removed here, before the
+# definitions below are parsed, and its command becomes the cd that gvm's
+# own cd() delegates to, so it keeps doing what it did. `alias cd` prints
+# "alias cd='...'" in bash and "cd=..." in zsh, quoted only when needed; the
+# command substitution runs only for a shell that has the alias.
+__gvm_cd_alias=""
+if alias cd > /dev/null 2>&1; then
+    __gvm_cd_alias="$(alias cd)"
+    __gvm_cd_alias="${__gvm_cd_alias#*=}"
+    if [[ "${__gvm_cd_alias}" == \'*\' ]]; then
+        __gvm_cd_alias="${__gvm_cd_alias#\'}"
+        __gvm_cd_alias="${__gvm_cd_alias%\'}"
+    fi
+    unalias cd
+fi
+
 # user could be reloading this file, restore preserved functions if we've been
 # through here already.
 if __gvm_is_function __gvm_oldcd; then
@@ -15,6 +36,16 @@ if __gvm_is_function __gvm_oldcd; then
     eval "$(echo "cd()"; declare -f __gvm_oldcd | sed '1 s/{/\'$'\n''{/' | tail -n +2)"
     unset -f __gvm_oldcd
 fi
+
+if [[ -n "${__gvm_cd_alias}" ]]; then
+    # an alias for cd itself, such as `alias cd='cd -P'`, has to reach the
+    # builtin rather than the function defined below
+    case "${__gvm_cd_alias}" in
+        cd|"cd "*) __gvm_cd_alias="builtin ${__gvm_cd_alias}" ;;
+    esac
+    eval "cd() { ${__gvm_cd_alias} \"\$@\"; }"
+fi
+unset __gvm_cd_alias
 
 if __gvm_is_function cd; then
     eval "$(echo "__gvm_oldcd()"; declare -f cd | sed '1 s/{/\'$'\n''{/' | tail -n +2)"

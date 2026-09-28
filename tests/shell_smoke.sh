@@ -188,6 +188,46 @@ assert_match "gvm implode answered y removes gvm" "GVM successfully removed" "$i
 assert_equal "gvm implode answered y removes the root" "no" "$([ -d "$implode_root" ] && echo yes || echo no)"
 rm -rf "$implode_root"
 
+# Sourcing gvm behind an alias on cd, as zoxide and several plugins set up,
+# must succeed and must keep the alias's command in the loop: zsh refused to
+# define cd() while cd was an alias, a parse error that aborted the whole
+# source, and bash defined gvm's cd() under the alias's own name instead
+# (issue #9). Checked in a child shell of the same kind, from a script so
+# that the alias is in force by the time gvm is sourced.
+alias_root="$GVM_ROOT/tmp-cd-alias"
+rm -rf "$alias_root" "$GVM_ROOT/gos/$version" "$GVM_ROOT/pkgsets/$version" "$GVM_ROOT/environments/$version"
+mkdir -p "$alias_root/proj" "$GVM_ROOT/gos/$version/bin" "$GVM_ROOT/pkgsets/$version/global"
+printf 'export GVM_ROOT; GVM_ROOT="%s"\n' "$GVM_ROOT" > "$GVM_ROOT/environments/$version"
+{
+	printf 'export gvm_go_name; gvm_go_name="%s"\n' "$version"
+	printf 'export gvm_pkgset_name; gvm_pkgset_name="global"\n'
+	printf 'export GOROOT; GOROOT="$GVM_ROOT/gos/%s"\n' "$version"
+	printf 'export GOPATH; GOPATH="$GVM_ROOT/pkgsets/%s/global"\n' "$version"
+	printf 'export PATH; PATH="$GVM_ROOT/gos/%s/bin:$GVM_ROOT/bin:$PATH"\n' "$version"
+} >> "$GVM_ROOT/environments/$version"
+printf '%s\n' "$version" > "$alias_root/proj/.go-version"
+{
+	echo '[ -n "${BASH_VERSION:-}" ] && shopt -s expand_aliases && FUNCNEST=64'
+	echo 'unset GVM_DEBUG'
+	echo '__smoke_jump() { echo "jump ${1##*/}" >&2; builtin cd "$@"; }'
+	echo 'alias cd=__smoke_jump'
+	echo '. "$GVM_ROOT/scripts/gvm" > /dev/null'
+	echo 'echo "sourced rc=$?"'
+	echo 'cd "$GVM_ROOT/tmp-cd-alias/proj" > /dev/null'
+	echo 'echo "version=$gvm_go_name pwd=${PWD##*/}"'
+	echo 'alias cd > /dev/null 2>&1 && echo "cd is still an alias"'
+	echo 'true'
+} > "$alias_root/jump.sh"
+child_shell=bash
+[ -n "$ZSH_VERSION" ] && child_shell=zsh
+alias_out="$($child_shell "$alias_root/jump.sh" 2>&1)"
+assert_match "gvm loads behind an alias on cd" "sourced rc=0" "$alias_out"
+assert_match "cd behind the alias still auto-switches" "version=$version pwd=proj" "$alias_out"
+assert_match "the alias's command is still called" "jump proj" "$alias_out"
+assert_equal "the alias is gone after gvm loads" "" "$(printf '%s' "$alias_out" | grep 'still an alias')"
+assert_equal "no parse error while loading" "" "$(printf '%s' "$alias_out" | grep -i 'parse error')"
+rm -rf "$alias_root" "$GVM_ROOT/gos/$version" "$GVM_ROOT/pkgsets/$version" "$GVM_ROOT/environments/$version"
+
 if [ "$failures" -ne 0 ]; then
 	echo "## $failures assertion(s) failed under $shell_name"
 	exit 1
