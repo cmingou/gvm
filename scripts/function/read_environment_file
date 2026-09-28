@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
-
 # __gvm_read_environment_file()
 # /*!
 # @abstract Read and parse a gvm environment file
@@ -24,6 +22,12 @@
 #   or an empty string (status 1) on failure.
 # */
 __gvm_read_environment_file() {
+    # The pseudo-hash module is loaded on the first call rather than when this
+    # file is, which is at every shell startup: nothing on the startup, cd or
+    # `gvm use` path uses it any more (issue #2), and gvm itself no longer
+    # calls this function.
+    . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
+
     if [[ -n $ZSH_VERSION ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
