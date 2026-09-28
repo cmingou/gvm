@@ -17,6 +17,22 @@ update_profile() {
 	fi
 }
 
+# A bash login shell reads only the first of ~/.bash_profile, ~/.bash_login
+# and ~/.profile that exists, so the source line has to go into that file.
+# It used to be appended to ~/.profile whenever that existed, which bash never
+# reads next to a ~/.bash_profile, so on such a Mac gvm was never loaded while
+# the installer reported success (issue #4).
+update_bash_login_profile() {
+	local profile
+	for profile in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+		if [ -f "$profile" ]; then
+			update_profile "$profile"
+			return $?
+		fi
+	done
+	return 1
+}
+
 check_existing_go() {
 
 	if [ "$GOROOT" = "" ]; then
@@ -107,24 +123,30 @@ popd > /dev/null
 source_line="[[ -s \"${GVM_DEST}/$GVM_NAME/scripts/gvm\" ]] && source \"${GVM_DEST}/$GVM_NAME/scripts/gvm\""
 source_file="${GVM_DEST}/$GVM_NAME/scripts/gvm"
 
+# profile_updated records whether any profile received the source line. The
+# warning below used to test $? after this block, but only after the
+# GVM_NO_UPDATE_PROFILE test that precedes it in the same condition, whose
+# own status is what $? then holds: the warning could never fire, and an
+# install that found no profile to update still ended in silence (issue #4).
+profile_updated=1
 if [ -z "$GVM_NO_UPDATE_PROFILE" ] ; then
   if [ -f "$HOME/.zshrc" ]; then
-    update_profile "$HOME/.zshrc"
+    update_profile "$HOME/.zshrc" && profile_updated=0
   fi
   if [ "$(uname)" == "Linux" ]; then
-    update_profile "$HOME/.bashrc" || update_profile "$HOME/.bash_profile"
+    { update_profile "$HOME/.bashrc" || update_profile "$HOME/.bash_profile"; } && profile_updated=0
   elif [ "$(uname)" == "Darwin" ]; then
     LOGIN_SHELL=$(finger $(id -u -n) | grep Shell | cut -d : -f 3)
     echo "macOS detected. User shell is:" $LOGIN_SHELL
     if [ $LOGIN_SHELL == "/bin/zsh" ]; then 		# macOS moved to ZSH after macOS Catalina
-      update_profile "$HOME/.zshrc"
+      update_profile "$HOME/.zshrc" && profile_updated=0
     else
-      update_profile "$HOME/.profile" || update_profile "$HOME/.bash_profile"
+      update_bash_login_profile && profile_updated=0
     fi
   fi
 fi
 
-if [ -z "$GVM_NO_UPDATE_PROFILE" ] && [ "$?" != "0" ]; then
+if [ -z "$GVM_NO_UPDATE_PROFILE" ] && [ "$profile_updated" != "0" ]; then
 	echo "Unable to locate profile settings file(Something like $HOME/.bashrc or $HOME/.bash_profile)"
 	echo
 	echo " You will have to manually add the following line:"
