@@ -1,6 +1,44 @@
 #!/usr/bin/env bash
 
+# __gvm_implode_clean_profile()
+# /*!
+# @abstract Remove the installer's source line from one shell profile
+# @discussion
+# binscripts/gvm-installer appends
+#   [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
+#   to the user's profile, and nothing removed it again: after gvm implode
+#   every new shell kept sourcing a file that no longer existed, silently
+#   because of the -s guard, for good (issue #31). Only a line that is that
+#   line, for this GVM_ROOT, is dropped; anything else in the file is kept as
+#   it is. The file is rewritten in place through its own path, so a profile
+#   that is a symlink into a dotfiles checkout stays a symlink and keeps its
+#   mode. Shell builtins only, so it reads the same on bash 3.2 and zsh.
+# @param profile Path of the profile to clean
+# @return Returns success (status 0) if the line was found and removed, or
+#   failure (status 1) if the file is missing or does not contain it.
+# */
+__gvm_implode_clean_profile() {
+  local profile="$1"
+  local source_line="[[ -s \"$GVM_ROOT/scripts/gvm\" ]] && source \"$GVM_ROOT/scripts/gvm\""
+  local _line kept="" found=false
+
+  [[ -f "$profile" && -r "$profile" && -w "$profile" ]] || return 1
+
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    if [[ "$_line" == "$source_line" ]]; then
+      found=true
+      continue
+    fi
+    kept="$kept$_line"$'\n'
+  done < "$profile"
+
+  [[ "$found" == true ]] || return 1
+  printf '%s' "$kept" > "$profile"
+}
+
 function gvm_implode() {
+  local profile
+
   # The confirmation used `read -p PROMPT -n 1 -r`, which is bash-only: to zsh
   # -p means "read from a coprocess" and -n "test for input", so the call
   # failed before reading anything, the removal was always cancelled, and the
@@ -14,6 +52,17 @@ function gvm_implode() {
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
    display_message "Action cancelled"
  else
-   (rm -rf "$GVM_ROOT" && display_message "GVM successfully removed") || display_error "Failed to uninstall gvm"
+   (rm -rf "$GVM_ROOT" && display_message "GVM successfully removed") || display_error "Failed to uninstall gvm" || return 1
+   # The profiles the installer may have written to. GVM_NO_UPDATE_PROFILE
+   # keeps them untouched here as it does there. A profile without the line
+   # is not a failure, so the loop's status is not the function's.
+   if [[ -z "$GVM_NO_UPDATE_PROFILE" ]]; then
+     for profile in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+       if __gvm_implode_clean_profile "$profile"; then
+         display_message "Removed the gvm source line from $profile"
+       fi
+     done
+   fi
+   return 0
  fi
 }

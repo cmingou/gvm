@@ -161,6 +161,10 @@ To completely remove gvm and all installed Go versions and packages:
 
     gvm implode
 
+This also removes the line the installer added to your shell profile
+(`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, `~/.bash_login` or `~/.profile`).
+Set `GVM_NO_UPDATE_PROFILE=1` to leave the profile untouched.
+
 If that doesn't work see the troubleshooting steps at the bottom of this page.
 
 Mac OS X Requirements
