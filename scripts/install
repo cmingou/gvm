@@ -160,6 +160,11 @@ install_go() {
 	display_message "$GO_NAME successfully installed!"
 }
 
+# Every failure below returns rather than exits: `exit` from here ended the
+# whole scripts/install process, so main()'s `install_go_binary || ...`
+# fallback for --prefer-binary was unreachable and the flag behaved exactly
+# like -B (issue #25). install_go_binary and main() turn the status into the
+# exit or the fallback that the chosen mode asks for.
 download_binary() {
 	mkdir -p $GO_INSTALL_ROOT >> "${GVM_ROOT}/logs/go-${GO_NAME}-download-binary" 2>&1
 	if [ "$(uname)" == "Darwin" ]; then
@@ -175,7 +180,7 @@ download_binary() {
 				display_error "Binary Go unavailable for this platform"
 				rm -rf $GO_INSTALL_ROOT
 				rm -f $GO_BINARY_PATH
-				exit 1
+				return 1
 			fi
 		fi
 	else
@@ -216,7 +221,7 @@ download_binary() {
 			display_error "Failed to download binary go"
 			rm -rf $GO_INSTALL_ROOT
 			rm -f $GO_BINARY_PATH
-			exit 1
+			return 1
 		fi
 	fi
 
@@ -226,7 +231,7 @@ download_binary() {
 		display_error "Failed to extract binary go"
 		rm -rf $GO_INSTALL_ROOT
 		rm -f $GO_BINARY_PATH
-		exit 1
+		return 1
 	fi
 }
 
@@ -247,7 +252,7 @@ install_go_binary() {
 	display_message "Installing $GO_NAME from binary source"
 
 	create_global_package_set
-	download_binary
+	download_binary || return 1
 	create_enviroment
 }
 
@@ -338,7 +343,7 @@ main() {
 	fi
 
 	if [[ "x$INSTALL_SOURCE" == "xbinary" ]]; then
-		install_go_binary
+		install_go_binary || exit 1
 	elif [[ "x$INSTALL_SOURCE" == "xprefer-binary" ]]; then
 		install_go_binary || {
 			display_message "Falling back to source installation of $GO_NAME"
