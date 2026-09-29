@@ -1,0 +1,15 @@
+# gvm is shell scripts that bash and zsh read verbatim: a CR at the end of a
+# line becomes part of the command, and every script fails with the opaque
+# "$'\r': command not found" (issue #22). A checkout made with
+# core.autocrlf=true, the Git for Windows default that a checkout shared with
+# WSL inherits, converted every file to CRLF. eol=lf pins LF in the working
+# tree whatever core.autocrlf and core.eol say, and git applies it on the
+# initial checkout of a clone, so the installer's clone is covered too.
+* text=auto eol=lf
+
+# The scripts have no extension, so they are named rather than left to the
+# text=auto heuristic.
+bin/**        text eol=lf
+binscripts/** text eol=lf
+scripts/**    text eol=lf
+tests/**      text eol=lf
