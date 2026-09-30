@@ -56,7 +56,7 @@ function gvm_implode() {
    # The profiles the installer may have written to. GVM_NO_UPDATE_PROFILE
    # keeps them untouched here as it does there. A profile without the line
    # is not a failure, so the loop's status is not the function's.
-   if [[ -z "$GVM_NO_UPDATE_PROFILE" ]]; then
+   if [[ -z "${GVM_NO_UPDATE_PROFILE:-}" ]]; then
      for profile in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
        if __gvm_implode_clean_profile "$profile"; then
          display_message "Removed the gvm source line from $profile"

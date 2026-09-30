@@ -62,7 +62,8 @@ gvm_pkgset_use() {
     local pkgset_rematch local_pkgset_rematch
 
     [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "gvm_pkgset_use: \$@   => $@"
-    for _option in "${@}"; do
+    # ${1+"$@"}: bash 3.2 under set -u treats an empty "$@" as unset (issue #20)
+    for _option in ${1+"$@"}; do
         [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]:-}() argument: ${_option:-[EMPTY]}"
 
         # if the accumulator has a trailing option flag (that is, the option

@@ -89,7 +89,10 @@ gvm_use() {
     goversion_alias_regex="${goversion_alias_regex/%\$/$at_pkgset_regex}\$"
     local version_rematch
 
-    for _option in "${@}"
+    # ${1+"$@"} rather than "$@": with no arguments at all, bash 3.2 under
+    # set -u treats the expansion as unset and ends the shell; the classic
+    # form expands to nothing there and to "$@" otherwise (issue #20).
+    for _option in ${1+"$@"}
     do
         [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]:-}() argument: ${_option:-[EMPTY]}"
 
@@ -128,9 +131,11 @@ gvm_use() {
             version_seen=true
             # if pkgset is present, add that to the accumulator as well
             # other --pkgset argument supplied.
-            if [[ -n "${GVM_REMATCH[5]}" ]]
+            # :- because not every version regex has a fifth group, and an
+            # unset array element aborts a shell under set -u (issue #20)
+            if [[ -n "${GVM_REMATCH[5]:-}" ]]
             then
-                accumulator+=( "--pkgset" "${GVM_REMATCH[5]}" )
+                accumulator+=( "--pkgset" "${GVM_REMATCH[5]:-}" )
             fi
         elif [[ "${version_rematch}" == true ]] &&
                 [[ ${#accumulator[@]} -gt 0 &&
