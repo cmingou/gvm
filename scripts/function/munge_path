@@ -23,7 +23,7 @@
 #   (status 1) on failure.
 # */
 __gvm_munge_path() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -41,7 +41,7 @@ __gvm_munge_path() {
     local IFS="$defaultIFS"
 
     if [[ -z "${path_in}" ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -88,7 +88,11 @@ __gvm_munge_path() {
     unset _path
 
     # assemble path array
-    path_out_ary=( "${rvm_ary[@]}" "${gvm_ary[@]}" "${general_ary[@]}" )
+    # ${ary[@]+"${ary[@]}"}: an empty array counts as unset under bash 3.2,
+    # so a plain "${ary[@]}" aborts a shell running under set -u, and the
+    # rvm list is empty for most users (issue #20). Same in the two
+    # expansions below.
+    path_out_ary=( ${rvm_ary[@]+"${rvm_ary[@]}"} ${gvm_ary[@]+"${gvm_ary[@]}"} ${general_ary[@]+"${general_ary[@]}"} )
 
     # deduplicate path_out_ary if requested, do this just to be helpful :)
     if [[ "${path_dedupe_flag}" == true ]]
@@ -105,24 +109,24 @@ __gvm_munge_path() {
             done
             unset __element
         done
-        path_out_ary=( "${_dedupe_path_out_ary[@]}" )
+        path_out_ary=( ${_dedupe_path_out_ary[@]+"${_dedupe_path_out_ary[@]}"} )
         unset _dedupe_path_out_ary
     fi
 
     # reconstruct new path
-    IFS=":" path_out="${path_out_ary[*]}" IFS="$defaultIFS"
+    IFS=":" path_out="${path_out_ary[*]+${path_out_ary[*]}}" IFS="$defaultIFS"
 
     printf "%s" "${path_out}"
 
     if [[ -z "${path_out}" ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi

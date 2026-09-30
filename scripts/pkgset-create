@@ -73,10 +73,10 @@ if [ "${target_set_name}" != "global" ]; then
 	mkdir -p "${target_top}/pkgsets/${gvm_go_name}/${target_set_name}/overlay/"{bin,lib/pkgconfig}
 	echo "export PATH; PATH=\"${target_top}/pkgsets/${gvm_go_name}/${target_set_name}/bin:\${GVM_OVERLAY_PREFIX}/bin:\${PATH}\"" >> "$env_file" ||
 		display_fatal "Could not extend environment"
-	echo "export LD_LIBRARY_PATH; LD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${LD_LIBRARY_PATH}\"" >> "$env_file" ||
+	echo "export LD_LIBRARY_PATH; LD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\"" >> "$env_file" ||
 		display_fatal "Could not extend environment"
-	echo "export DYLD_LIBRARY_PATH; DYLD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib:\${DYLD_LIBRARY_PATH}\"" >> "$env_file" ||
+	echo "export DYLD_LIBRARY_PATH; DYLD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib\${DYLD_LIBRARY_PATH:+:\$DYLD_LIBRARY_PATH}\"" >> "$env_file" ||
 		display_fatal "Could not extend environment"
-	echo "export PKG_CONFIG_PATH; PKG_CONFIG_PATH=\"\${GVM_OVERLAY_PREFIX}/lib/pkgconfig:\${PKG_CONFIG_PATH}\"" >> "$env_file" ||
+	echo "export PKG_CONFIG_PATH; PKG_CONFIG_PATH=\"\${GVM_OVERLAY_PREFIX}/lib/pkgconfig\${PKG_CONFIG_PATH:+:\$PKG_CONFIG_PATH}\"" >> "$env_file" ||
 		display_fatal "Could not extend environment"
 fi

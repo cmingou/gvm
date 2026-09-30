@@ -23,7 +23,7 @@
 function gvm_environment_sanitize() {
 	local env_file="$GVM_ROOT/environments/$1"
 	local ACTIVE_GO="$(command -v go)"
-	local OLD_GOROOT="$GOROOT"
+	local OLD_GOROOT="${GOROOT:-}"
 	local NEW_GOROOT=""
 
 	# nothing to reconcile: no go on PATH, no GOROOT recorded, or the active go

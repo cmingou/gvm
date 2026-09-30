@@ -102,15 +102,15 @@ cd() {
     # defaults_go_pkgset directly, instead of going through
     # __gvm_read_environment_file and the pseudo-hash accessors, which fork a
     # subshell per key (issue #1).
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolving defaults..."
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Resolving defaults..."
     if __gvmp_read_defaults "${GVM_ROOT}/environments/default"; then
         defaults_resolved=true
     else
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Can't find default environment. Falling back to system."
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Can't find default environment. Falling back to system."
         if __gvmp_read_defaults "${GVM_ROOT}/environments/system"; then
             defaults_resolved=true
         else
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Can't find system environment."
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Can't find system environment."
         fi
     fi
 
@@ -128,8 +128,8 @@ cd() {
         # installed versions changes, so it is still resolved once per shell;
         # gvm() clears the cache, and every command that installs, removes or
         # switches a version goes through gvm().
-        if [[ "${__gvmp_fallback_cached}" != true ]]; then
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolving fallback go version from all available."
+        if [[ "${__gvmp_fallback_cached:-}" != true ]]; then
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Resolving fallback go version from all available."
             __gvmp_resolve_fallback_version
             __gvmp_fallback_go_name="${__gvmp_resolved_version}"
             __gvmp_fallback_cached=true
@@ -142,24 +142,24 @@ cd() {
         # version it depends on $PWD, so it cannot be cached across
         # directories. Anything that starts using defaults_go_pkgset for real
         # has to resolve it here again.
-        if [[ "${GVM_DEBUG}" -eq 1 ]]; then
+        if [[ "${GVM_DEBUG:-}" -eq 1 ]]; then
             __gvmp_resolve_fallback_pkgset "${defaults_go_name}"
             defaults_go_pkgset="${__gvmp_resolved_pkgset}"
         fi
 
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "======================================="
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "fallback_go_version => $defaults_go_name"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "fallback_go_pkgset => $defaults_go_pkgset"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "======================================="
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "======================================="
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "fallback_go_version => $defaults_go_name"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "fallback_go_pkgset => $defaults_go_pkgset"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "======================================="
         defaults_resolved=true
     fi
 
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "defaults_go_name => $defaults_go_name"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "defaults_go_pkgset => $defaults_go_pkgset"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "defaults_go_name => $defaults_go_name"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "defaults_go_pkgset => $defaults_go_pkgset"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-    if [[ "${GVM_DEBUG}" -eq 1 ]]; then
+    if [[ "${GVM_DEBUG:-}" -eq 1 ]]; then
         echo "Resolved default go: ${defaults_go_name:-[EMPTY]}"
         echo "Resolved default pkgset: ${defaults_go_pkgset:-[EMPTY]}"
     fi
@@ -174,13 +174,13 @@ cd() {
     [[ -n "${dot_go_pkgset}" ]] && pkgset_rslt=0
     [[ ${pkgset_rslt} -eq 0 ]] && __gvmp_read_dot_go_pkgset "${dot_go_pkgset}"
 
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "---------------------------------------"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_version => $dot_go_version"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "defaults_go_name => $defaults_go_name"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "---------------------------------------"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "---------------------------------------"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "dot_go_version => $dot_go_version"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "defaults_go_name => $defaults_go_name"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "---------------------------------------"
 
     if [[ $rslt -eq 0 ]]; then
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found dot_go_version: ${dot_go_version}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Found dot_go_version: ${dot_go_version}"
         local use_goversion=""
         __gvmp_read_dot_go_version "${dot_go_version}"
         if [[ -n "${use_goversion}" ]]; then
@@ -189,10 +189,10 @@ cd() {
             # dozens of processes and leaves the shell on the version's global
             # pkgset, or on the one .go-pkgset names once that is applied
             # below; when that is already the state, there is nothing to do.
-            if [[ "${use_goversion}" == "${gvm_go_name}" && "${gvm_pkgset_name}" == "${use_gopkgset:-global}" ]]; then
-                [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Already using: ${use_goversion}"
+            if [[ "${use_goversion}" == "${gvm_go_name:-}" && "${gvm_pkgset_name:-}" == "${use_gopkgset:-global}" ]]; then
+                [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Already using: ${use_goversion}"
             else
-                [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
+                [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
                 gvm use "${use_goversion}" || return 1
             fi
         else
@@ -204,12 +204,12 @@ cd() {
         fi
         unset use_goversion
     elif [[ -n "${defaults_go_name}" ]]; then
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-version found. Using system or default go."
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "No .go-version found. Using system or default go."
         # gvm use --quiet "${defaults_go_name}" || return 1
         # gvm use "${defaults_go_name}" || return 1
     else
         # quietly failing
-        if [[ "${GVM_DEBUG}" -eq 1 ]]; then
+        if [[ "${GVM_DEBUG:-}" -eq 1 ]]; then
             echo "No fallback go version could be found."
             if [[ ! -d "$GVM_ROOT/archive/go" ]]; then
                 echo "$(locale_text_for_key "go_install_prompt")"
@@ -221,25 +221,25 @@ cd() {
     fi
 
     rslt=${pkgset_rslt}
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_pkgset => $dot_go_pkgset"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "--------------------------------"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "dot_go_pkgset => $dot_go_pkgset"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "--------------------------------"
     if [[ $rslt -eq 0 ]]; then
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found .go-pkgset: ${dot_go_pkgset}"
-        if [[ -n "${use_gopkgset}" && "${use_gopkgset}" == "${gvm_pkgset_name}" ]]; then
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Already using pkgset: ${use_gopkgset}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Found .go-pkgset: ${dot_go_pkgset}"
+        if [[ -n "${use_gopkgset}" && "${use_gopkgset}" == "${gvm_pkgset_name:-}" ]]; then
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Already using pkgset: ${use_gopkgset}"
         else
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_gopkgset}"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Switching to: ${use_gopkgset}"
             gvm pkgset use "${use_gopkgset}" || return 1
         fi
         unset use_gopkgset
     elif [[ -n "${defaults_go_pkgset}" ]];then
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-pkgset found. Using system or default pkgset."
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "----------    defaults_go_pkgset => $defaults_go_pkgset     ----------"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "No .go-pkgset found. Using system or default pkgset."
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "----------    defaults_go_pkgset => $defaults_go_pkgset     ----------"
         # gvm pkgset use --quiet "${defaults_go_pkgset}" || return 1
     else
         # quietly failing
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No fallback pkgset could be found."
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "No fallback pkgset could be found."
     fi
 
     return 0

@@ -36,7 +36,7 @@
 # */
 
 setValueForKeyFakeAssocArray() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -52,7 +52,7 @@ setValueForKeyFakeAssocArray() {
 
     if [[ -z "${target_key}" ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -80,7 +80,7 @@ setValueForKeyFakeAssocArray() {
 
     printf "%s" "${target_ary[*]}"
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
@@ -113,7 +113,7 @@ setValueForKeyFakeAssocArray() {
 #   (status 1) on failure.
 # */
 valueForKeyFakeAssocArray() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -127,7 +127,7 @@ valueForKeyFakeAssocArray() {
 
     if [[ -z "${target_key}" || ${#target_ary[@]} -eq 0 ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -145,7 +145,7 @@ valueForKeyFakeAssocArray() {
 
     printf "%b" "${value}"
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
@@ -163,7 +163,7 @@ valueForKeyFakeAssocArray() {
 #   (status 1) on failure.
 # */
 keysForFakeAssocArray() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -176,7 +176,7 @@ keysForFakeAssocArray() {
 
     if [[ ${#target_ary[@]} -eq 0 ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -193,14 +193,14 @@ keysForFakeAssocArray() {
     printf "%s" "${target_ary_keys[*]}"
 
     if [[ "${#target_ary_keys[@]}" -eq 0 ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
@@ -221,7 +221,7 @@ keysForFakeAssocArray() {
 #   (status 1) on failure.
 # */
 prettyDumpFakeAssocArray() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -233,7 +233,7 @@ prettyDumpFakeAssocArray() {
 
     if [[ ${#target_ary[@]} -eq 0 ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -248,7 +248,7 @@ prettyDumpFakeAssocArray() {
         unset __key __val
     done
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
@@ -260,7 +260,7 @@ prettyDumpFakeAssocArray() {
 # @internal
 # */
 _encode() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -272,7 +272,7 @@ _encode() {
 
     if [[ -z "${string}" ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -301,14 +301,14 @@ _encode() {
     printf "%s" "${new_string}"
 
     if [[ -z "${new_string}" ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
@@ -320,7 +320,7 @@ _encode() {
 # @internal
 # */
 _decode() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -329,7 +329,7 @@ _decode() {
 
     if [[ -z "${string}" ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -345,14 +345,14 @@ _decode() {
     printf "%b" "${new_string}"
 
     if [[ -z "${new_string}" ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi
