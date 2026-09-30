@@ -9,3 +9,16 @@ tmp/
 scripts/gvm
 Gemfile.lock
 .vagrant/
+# left behind by autogen.sh, configure and make (see "Installing from a
+# checkout with autotools" in README.md)
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache/
+config.log
+config.status
+configure
+install-sh
+missing
+COPYING
+INSTALL
