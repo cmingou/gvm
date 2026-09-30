@@ -88,6 +88,31 @@ SRC_REPO=https://github.com/moovweb/gvm.git \
   bash < <(curl -s -S -L https://raw.githubusercontent.com/cmingou/gvm/master/binscripts/gvm-installer)
 ```
 
+Installing from a checkout with autotools
+-----------------------------------------
+
+The repository also carries an autotools build, for installing a checkout or
+a release tarball to a fixed prefix without the installer's clone. It needs
+autoconf, automake and make:
+
+```
+./autogen.sh --prefix=/usr/local
+sudo make install
+```
+
+This installs gvm to `<prefix>/gvm` (`/usr/local/gvm` here) and a copy of
+`bin/gvm` to `<prefix>/bin`. Unlike the installer it edits no shell profile:
+add the line it prints at the end,
+
+```
+[[ -s "/usr/local/gvm/scripts/gvm" ]] && source "/usr/local/gvm/scripts/gvm"
+```
+
+to your `.bashrc`, `.bash_profile` or `.zshrc` yourself. A Go already on
+`PATH` is recorded as the `system` version, as the installer does. `gvm
+install` writes below `<prefix>/gvm`, so pick a prefix you can write to, such
+as `--prefix=$HOME/.local`, unless you want to run it as root.
+
 Installing Go
 =============
     gvm install go1.4

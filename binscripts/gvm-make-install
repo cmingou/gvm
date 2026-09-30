@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# gvm-make-install SRCDIR DESTDIR [GVM_ROOT]
+#
+# The `make install` step of the autotools build: Makefile.am's
+# install-exec-hook runs it with the checkout, the directory to install into
+# and the path that directory has at runtime (the two differ only under a
+# DESTDIR staging install). It used to be a bare `cp -rf . $(install_dir)`,
+# which copied the checkout's .git into the install, and gvm refuses to run
+# from a root that has one; it also wrote no scripts/gvm for the install
+# location and no environment for a Go already on PATH, both of which only
+# binscripts/gvm-installer did, so `make install` produced a broken install
+# (issue #39).
+#
+# This copies the tree without the repository, the autotools products and any
+# gvm state a checkout used as a root may carry, writes scripts/gvm, records
+# an existing Go as the "system" version the way the installer does, and
+# prints the line to add to a shell profile. It edits no profile: make install
+# is usually run as root, and the profile that needs the line is the user's.
+
+set -e
+
+src=${1:-}
+dest=${2:-}
+root=${3:-$dest}
+
+if [ -z "$src" ] || [ -z "$dest" ]; then
+	echo "usage: gvm-make-install SRCDIR DESTDIR [GVM_ROOT]" >&2
+	exit 64
+fi
+if [ ! -f "$src/scripts/gvm-default" ]; then
+	echo "gvm-make-install: $src does not look like a gvm checkout" >&2
+	exit 65
+fi
+
+mkdir -p "$dest"
+for entry in "$src"/* "$src"/.[!.]*; do
+	[ -e "$entry" ] || continue
+	case "${entry##*/}" in
+		# the repository, which gvm refuses to run next to
+		.git|git.bak) continue ;;
+		# what autogen.sh, configure and make leave in the checkout
+		autom4te.cache|config.log|config.status|configure|Makefile|Makefile.in|aclocal.m4|install-sh|missing|COPYING|INSTALL) continue ;;
+		# state of a checkout that was itself used as GVM_ROOT
+		gos|pkgsets|environments|archive|logs) continue ;;
+	esac
+	cp -R "$entry" "$dest/"
+done
+mkdir -p "$dest/environments" "$dest/gos" "$dest/pkgsets" "$dest/archive" "$dest/logs"
+
+# The same two lines the installer writes, for the install location rather
+# than the @prefix@ configure substituted into the checkout's scripts/gvm.
+printf 'export GVM_ROOT=%s\n. $GVM_ROOT/scripts/gvm-default\n' "$root" > "$dest/scripts/gvm"
+
+# An existing Go becomes the "system" version, as in the installer.
+goroot=${GOROOT:-}
+if [ -z "$goroot" ] && command -v go > /dev/null 2>&1; then
+	goroot=$(go env GOROOT 2> /dev/null || true)
+fi
+if [ -n "$goroot" ]; then
+	mkdir -p "$dest/pkgsets/system/global" "$dest/gos/system"
+	cat > "$dest/environments/system" << EOS
+# Automatically generated file. DO NOT EDIT!
+export GVM_ROOT; GVM_ROOT="$root"
+export gvm_go_name; gvm_go_name="system"
+export gvm_pkgset_name; gvm_pkgset_name="global"
+export GOROOT; GOROOT="$goroot"
+export GOPATH; GOPATH="$root/pkgsets/system/global"
+export PATH; PATH="$root/pkgsets/system/global/bin:$goroot/bin:$root/bin:\$PATH"
+EOS
+	cp "$dest/environments/system" "$dest/environments/system@global"
+	cat >> "$dest/environments/system@global" << EOS
+export gvm_pkgset_name="global"
+export GOPATH; GOPATH="$root/pkgsets/system/global:\$GOPATH"
+export PATH; PATH="$root/pkgsets/system/global/bin:\$PATH"
+EOS
+	echo "Created profile for existing install of Go at $goroot"
+else
+	echo "No existing Go versions detected"
+fi
+
+echo "Installed GVM v$(cat "$src/VERSION") to $root"
+echo
+echo "Add this line to your shell profile (.bashrc, .bash_profile or .zshrc):"
+echo
+echo "  [[ -s \"$root/scripts/gvm\" ]] && source \"$root/scripts/gvm\""
+echo
