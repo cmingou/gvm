@@ -225,7 +225,11 @@ gvm_use() {
         return 1
     fi
 
-    fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | $GREP_PATH "$version" | $HEAD_PATH -n 1 | $GREP_PATH "${version}")
+    # GREP_OPTIONS= keeps a user's colourised grep (BSD grep honours the
+    # variable) from writing ANSI escapes into the name that is used as a
+    # path below (issue #14). A per-command assignment, so the user's own
+    # setting is untouched.
+    fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | GREP_OPTIONS= $GREP_PATH "$version" | $HEAD_PATH -n 1 | GREP_OPTIONS= $GREP_PATH "${version}")
     if [[ -z "${fuzzy_match}" ]]; then
         local go_archive_path="$GVM_ROOT/archive/go"
         if [[ ! -d "${go_archive_path}" ]];then

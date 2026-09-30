@@ -4,7 +4,8 @@
 version=$1
 
 if [ "$version" != "" ]; then
-  fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | $GREP_PATH "$version" | $HEAD_PATH -n 1 | $GREP_PATH "$version") ||
+  # GREP_OPTIONS= keeps a colourised grep out of the name (issue #14)
+  fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | GREP_OPTIONS= $GREP_PATH "$version" | $HEAD_PATH -n 1 | GREP_OPTIONS= $GREP_PATH "$version") ||
 		display_fatal "Invalid version $version"
 
 	foldername=$GVM_ROOT/gos/$fuzzy_match
