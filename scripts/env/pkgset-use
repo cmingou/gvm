@@ -61,21 +61,21 @@ gvm_pkgset_use() {
     local local_pkgset_regex='^(/[^:[:cntrl:]]*)$'
     local pkgset_rematch local_pkgset_rematch
 
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "gvm_pkgset_use: \$@   => $@"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "gvm_pkgset_use: \$@   => $@"
     for _option in "${@}"; do
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]}() argument: ${_option:-[EMPTY]}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]:-}() argument: ${_option:-[EMPTY]}"
 
         # if the accumulator has a trailing option flag (that is, the option
         # flag has been specified but no argument has been supplied) then make
         # sure the next _option value is not another option flag.
         if [[ $(( ${#accumulator[@]}%2 )) -eq 1 && "${_option}" =~ ^[\-]+ ]]; then
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Missing argument for: '${accumulator[${#accumulator[@]}-1]}'"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Missing argument for: '${accumulator[${#accumulator[@]}-1]:-}'"
             return 1
         fi
 
         # scan pkgset_rematch checks exactly once each time through
         pkgset_rematch=false
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "_option: ${_option}, pkgset_regex: ${pkgset_regex}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "_option: ${_option}, pkgset_regex: ${pkgset_regex}"
         if __gvm_rematch "${_option}" "${pkgset_regex}"; then
             pkgset_rematch=true
         fi
@@ -90,11 +90,11 @@ gvm_pkgset_use() {
         if [[ "${pkgset_rematch}" == true ]] && [[ $(( ${#accumulator[@]}%2 )) -eq 0 ]]; then
             # if the regex matches and the accumulator is even, we can add the
             # key/val pair.
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "========================"
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "GVM_REMATCH => $GVM_REMATCH"
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo "========================"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "========================"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "GVM_REMATCH => $GVM_REMATCH"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "========================"
             accumulator+=( "--pkgset" "${GVM_REMATCH[1]}" )
-        elif [[ "${pkgset_rematch}" == true ]] && [[ ${#accumulator[@]} -gt 0 && "${accumulator[${#accumulator[@]}-1]}" == "--pkgset" ]]; then
+        elif [[ "${pkgset_rematch}" == true ]] && [[ ${#accumulator[@]} -gt 0 && "${accumulator[${#accumulator[@]}-1]:-}" == "--pkgset" ]]; then
             # if the regex matches and the accumulator is odd, the previous
             # element in the accumulator must be the option for which this
             # regex matches, we then just add the value.
@@ -139,7 +139,7 @@ gvm_pkgset_use() {
             for (( i=0; i<${#accumulator[@]}; i+=2 )); do
                 local __key __val
 
-                if [[ -n $ZSH_VERSION ]]; then
+                if [[ -n ${ZSH_VERSION:-} ]]; then
                     __key="${accumulator[i+1]}"
                     __val="${accumulator[i+2]}"
                 else
@@ -158,7 +158,7 @@ gvm_pkgset_use() {
         fi
     done
 
-    if [[ "${GVM_DEBUG}" -eq 1 && ${#accumulator[@]} -gt 0 ]]; then
+    if [[ "${GVM_DEBUG:-}" -eq 1 && ${#accumulator[@]} -gt 0 ]]; then
         printf "Accumulator wasn't flushed. Remaining elements:\n"
         local _item _index=0
         for _item in "${accumulator[@]}"; do
@@ -170,17 +170,17 @@ gvm_pkgset_use() {
     fi
     unset accumulator
 
-    if [[ "${GVM_DEBUG}" -eq 1 ]]; then
-        printf "Command (%s) options dump:\n" "${BASH_SOURCE[0]##*/}"
+    if [[ "${GVM_DEBUG:-}" -eq 1 ]]; then
+        printf "Command (%s) options dump:\n" "${BASH_SOURCE[0]+${BASH_SOURCE[0]##*/}}"
         printf "  [%s]: %s\n" "--pkgset" "${opt_pkgset}" "--local" "${opt_local}" \
             "--default" "${opt_default}" "--quiet" "${opt_quiet}"
     fi
 
-    [[ -n "$gvm_go_name" ]] || display_error "No Go version selected" || return 1
+    [[ -n "${gvm_go_name:-}" ]] || display_error "No Go version selected" || return 1
 
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "++++++++"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "options => pkgset:${opt_pkgset} local:${opt_local} default:${opt_default} quiet:${opt_quiet}"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "++++++++"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "++++++++"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "options => pkgset:${opt_pkgset} local:${opt_local} default:${opt_default} quiet:${opt_quiet}"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "++++++++"
 
     if [[ -n "${opt_local}" ]]; then
         local local_pkgset="${opt_local}"
@@ -195,7 +195,7 @@ gvm_pkgset_use() {
             display_error "Cannot find local package set" || return 1
 
         local_pkgset="${local_pkgset}/.gvm_local"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolved local directory: ${local_pkgset}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Resolved local directory: ${local_pkgset}"
 
         fuzzy_match=$($LS_PATH -1 "$local_pkgset/environments" | $SORT_PATH | $GREP_PATH "$gvm_go_name@" | $GREP_PATH "local" | $HEAD_PATH -n 1)
         [[ -n "${fuzzy_match}" ]] || display_error "Cannot find local package set" || return 1
@@ -212,7 +212,7 @@ gvm_pkgset_use() {
 
         # fix PATH to correct order
         local fixed_path="$(__gvm_munge_path)"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
         export PATH="${fixed_path}"
         unset fixed_path
 
@@ -225,18 +225,18 @@ gvm_pkgset_use() {
     elif [[ -n "${opt_pkgset}" ]]; then
         local pkgset="${opt_pkgset}"
 
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "=================="
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "gvm_go_name => $gvm_go_name"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "pkgset => $pkgset"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "=================="
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "=================="
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "gvm_go_name => $gvm_go_name"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "pkgset => $pkgset"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "=================="
 
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "$LS_PATH -1 "$GVM_ROOT/environments" | $SORT_PATH | $GREP_PATH "$gvm_go_name@" | $GREP_PATH "${pkgset}" | $HEAD_PATH -n 1"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "$LS_PATH -1 "$GVM_ROOT/environments" | $SORT_PATH | $GREP_PATH "$gvm_go_name@" | $GREP_PATH "${pkgset}" | $HEAD_PATH -n 1"
         fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/environments" | $SORT_PATH | $GREP_PATH "$gvm_go_name@" | $GREP_PATH "${pkgset}" | $HEAD_PATH -n 1)
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "fuzzy_match => $fuzzy_match"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "fuzzy_match => $fuzzy_match"
         # [[ -n "${fuzzy_match}" ]] || display_error "Invalid package set: ${pkgset}" || return 1
         if [[ -z "${fuzzy_match}" ]]; then
             gvm use --quiet $gvm_go_name
-            [[ "${GVM_DEBUG}" -eq 1 ]] && echo ">>>>>>>>   gvm pkgset create $pkgset   <<<<<<<"
+            [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo ">>>>>>>>   gvm pkgset create $pkgset   <<<<<<<"
             gvm pkgset create $pkgset
             gvm pkgset use --quiet $pkgset
         fi
@@ -247,7 +247,7 @@ gvm_pkgset_use() {
 
         # fix PATH to correct order
         local fixed_path="$(__gvm_munge_path)"
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
         export PATH="${fixed_path}"
         unset fixed_path
 

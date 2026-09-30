@@ -41,5 +41,16 @@ function gvm_source_environment() {
 		__gvm_env_script="${__gvm_env_script}${__gvm_env_line}"$'\n'
 	done < "${__gvm_env_file}"
 
+	# An environment file refers to variables that may be unset: the
+	# PKG_CONFIG_PATH line that earlier versions of gvm wrote expands a bare
+	# ${PKG_CONFIG_PATH}, and `gvm pkgenv` lets the user add anything. Under
+	# set -u the eval would abort on the first of those, so nounset is lifted
+	# for the eval and restored afterwards (issue #20). $- holds "u" while the
+	# option is on, in bash and in zsh.
+	local __gvm_env_status=0 __gvm_env_nounset=""
+	case "$-" in *u*) __gvm_env_nounset=1; set +u ;; esac
 	eval "${__gvm_env_script}"
+	__gvm_env_status=$?
+	[[ -n "${__gvm_env_nounset}" ]] && set -u
+	return ${__gvm_env_status}
 }

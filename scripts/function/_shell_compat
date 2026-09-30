@@ -4,7 +4,7 @@
 [[ ${GVM_SHELL_COMPAT:-} -eq 1 ]] && return || readonly GVM_SHELL_COMPAT=1
 
 # force zsh to start arrays at index 0
-# [[ -n $ZSH_VERSION ]] && setopt KSH_ARRAYS
+# [[ -n ${ZSH_VERSION:-} ]] && setopt KSH_ARRAYS
 
 # __gvm_is_function()
 # /*!
@@ -27,9 +27,9 @@ __gvm_is_function() {
 __gvm_callstack() {
     local index=${1}
 
-    if [[ "x${BASH_VERSION}" != "x" ]]; then
+    if [[ "x${BASH_VERSION:-}" != "x" ]]; then
         echo "${FUNCNAME[index]}"
-    elif [[ "x${ZSH_VERSION}" != "x" ]]; then
+    elif [[ "x${ZSH_VERSION:-}" != "x" ]]; then
         echo "${FUNCNAME[index+1]}"
     else
         echo "unknown caller"
@@ -62,7 +62,7 @@ __gvm_callstack() {
 
 
 __gvm_rematch() {
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -73,14 +73,14 @@ __gvm_rematch() {
     local rematch_ary; rematch_ary=()
 
     if [[ ${#string} -eq 0 ]];then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
     if [[ ${#regex} -eq 0 ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -90,7 +90,7 @@ __gvm_rematch() {
     # perform regex - same on bash and ksh
     [[ "${string}" =~ $regex ]]
     if [[ $? -ne 0 ]];then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -108,7 +108,7 @@ __gvm_rematch() {
         eval "${var_name}=( \"\${rematch_ary[@]}\" )"
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi

@@ -28,7 +28,7 @@ __gvm_read_environment_file() {
     # calls this function.
     . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS
         setopt BASH_REMATCH
     fi
@@ -39,7 +39,7 @@ __gvm_read_environment_file() {
 
     if [[ -z "${filepath}" || ! -r "${filepath}" ]]; then
         echo ""
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
@@ -59,23 +59,25 @@ __gvm_read_environment_file() {
             # strip leading and trailing quotes
             __val=${__val#\"}; __val=${__val%\"}
             # add to pseudo-hash
-            hash=( $(setValueForKeyFakeAssocArray "${__key}" "${__val}" "${hash[*]}") )
+            # ${hash[*]+...}: the empty array counts as unset under bash 3.2
+            # and would abort a shell running under set -u (issue #20)
+            hash=( $(setValueForKeyFakeAssocArray "${__key}" "${__val}" "${hash[*]+${hash[*]}}") )
         fi
 
         unset __key __val
     done <<< "$(cat "${filepath}")"
 
-    echo "${hash[@]}"
+    echo ${hash[@]+"${hash[@]}"}
 
     if [[ ${#hash[@]} -eq 0 ]]; then
-        if [[ -n $ZSH_VERSION ]]; then
+        if [[ -n ${ZSH_VERSION:-} ]]; then
             unsetopt KSH_ARRAYS
             unsetopt BASH_REMATCH
         fi
         return 1
     fi
 
-    if [[ -n $ZSH_VERSION ]]; then
+    if [[ -n ${ZSH_VERSION:-} ]]; then
         unsetopt KSH_ARRAYS
         unsetopt BASH_REMATCH
     fi

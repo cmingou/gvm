@@ -91,14 +91,17 @@ gvm_use() {
 
     for _option in "${@}"
     do
-        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]}() argument: ${_option:-[EMPTY]}"
+        [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]:-}() argument: ${_option:-[EMPTY]}"
 
         # if the accumulator has a trailing option flag (that is, the option
         # flag has been specified but no argument has been supplied) then make
         # sure the next _option value is not another option flag.
+        # The :- on the index expansions below keeps a shell running under
+        # set -u alive: zsh's arrays start at 1, so this bash-style index
+        # names an element that does not exist there (issue #20).
         if [[ $(( ${#accumulator[@]}%2 )) -eq 1 && "${_option}" =~ ^[\-]+ ]]
         then
-            echo "Missing argument for: '${accumulator[${#accumulator[@]}-1]}'"
+            echo "Missing argument for: '${accumulator[${#accumulator[@]}-1]:-}'"
             return 1
         fi
 
@@ -131,7 +134,7 @@ gvm_use() {
             fi
         elif [[ "${version_rematch}" == true ]] &&
                 [[ ${#accumulator[@]} -gt 0 &&
-                    "${accumulator[${#accumulator[@]}-1]}" == "--version" ]]
+                    "${accumulator[${#accumulator[@]}-1]:-}" == "--version" ]]
         then
             # if the regex matches and the accumulator is odd, the previous
             # element in the accumulator must be the option for which this
@@ -143,7 +146,7 @@ gvm_use() {
             accumulator+=( "--pkgset" "${GVM_REMATCH[1]}" )
         elif [[ "${_option}" =~ ^${pkgset_regex}$
             && ${#accumulator[@]} -gt 0
-            && "${accumulator[${#accumulator[@]}-1]}" == "--pkgset" ]]
+            && "${accumulator[${#accumulator[@]}-1]:-}" == "--pkgset" ]]
         then
             accumulator+=( "${GVM_REMATCH[1]}" )
         elif [[ "${_option}" == "--version" ]]
@@ -184,7 +187,7 @@ gvm_use() {
             do
                 local __key __val
 
-                if [[ -n $ZSH_VERSION ]]; then
+                if [[ -n ${ZSH_VERSION:-} ]]; then
                     __key="${accumulator[i+1]}"
                     __val="${accumulator[i+2]}"
                 else
@@ -205,9 +208,11 @@ gvm_use() {
     done
     unset accumulator
 
-    if [[ "${GVM_DEBUG}" -eq 1 ]]
+    if [[ "${GVM_DEBUG:-}" -eq 1 ]]
     then
-        printf "Command (%s) options dump:\n" "${BASH_SOURCE[0]##*/}"
+        # zsh has no BASH_SOURCE, and under set -u the bare expansion ended
+        # the shell; the + form expands to nothing there (issue #20)
+        printf "Command (%s) options dump:\n" "${BASH_SOURCE[0]+${BASH_SOURCE[0]##*/}}"
         printf "  [%s]: %s\n" "--version" "${opt_version}" "--pkgset" "${opt_pkgset}" \
             "--default" "${opt_default}" "--quiet" "${opt_quiet}"
     fi
@@ -243,7 +248,7 @@ gvm_use() {
 
     # fix PATH to correct order
     local fixed_path="$(__gvm_munge_path)"
-    [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
+    [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Original path: $PATH" && echo "Munged path: ${fixed_path}"
     export PATH="${fixed_path}"
     unset fixed_path
 
