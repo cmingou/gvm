@@ -90,15 +90,33 @@ compile_go() {
 		MAKE_SCRIPT=make.bash
 		;;
 	esac
-	[ -z "$GOROOT_BOOTSTRAP" ] && export GOROOT_BOOTSTRAP=$(go env GOROOT) 
+	# install_from_source has already checked that a bootstrap toolchain
+	# exists, so this only records where it is. It used to be exported
+	# unchecked: with no go on PATH that printed "go: command not found",
+	# exported GOROOT_BOOTSTRAP empty, and make.bash fell back to its own
+	# $HOME/go1.4 default and failed with "Cannot find .../go1.4/bin/go"
+	# (issue #27).
+	if [ -z "$GOROOT_BOOTSTRAP" ]; then
+		GOROOT_BOOTSTRAP=$(go env GOROOT 2> /dev/null)
+		[ -n "$GOROOT_BOOTSTRAP" ] ||
+			display_fatal "Could not determine GOROOT_BOOTSTRAP from 'go env GOROOT'. Set GOROOT_BOOTSTRAP to the root of a Go toolchain and retry."
+		export GOROOT_BOOTSTRAP
+	fi
 	unset GOARCH && unset GOOS && unset GOPATH && unset GOBIN && unset GOROOT &&
 	export GOBIN=$GO_INSTALL_ROOT/bin &&
 	export PATH=$GOBIN:$PATH &&
 	export GOROOT=$GO_INSTALL_ROOT &&
 	if [ ! -f "$GO_INSTALL_ROOT/VERSION" ]; then echo "$GO_NAME" > "$GO_INSTALL_ROOT/VERSION"; fi &&
 	#builtin cd $GO_INSTALL_ROOT/src && ./all.bash &> $GVM_ROOT/logs/go-$GO_NAME-compile.log ||
-	builtin cd "$GO_INSTALL_ROOT/src" && chmod -f +x $MAKE_SCRIPT && ./$MAKE_SCRIPT &> "$GVM_ROOT/logs/go-$GO_NAME-compile.log" ||
-		(rm -rf "$GO_INSTALL_ROOT" && display_fatal "Failed to compile. Check the logs at $GVM_ROOT/logs/go-$GO_NAME-compile.log")
+	builtin cd "$GO_INSTALL_ROOT/src" && chmod -f +x $MAKE_SCRIPT && ./$MAKE_SCRIPT &> "$GVM_ROOT/logs/go-$GO_NAME-compile.log" || {
+		# A brace group, not a subshell: display_fatal ends in `exit 1`, and
+		# inside ( ... ) that only ended the subshell, so install_go went on
+		# to create_enviroment, wrote an environment file for a version that
+		# does not exist and reported a second, bogus "Failed to use
+		# installed version" after the real error (issue #27).
+		rm -rf "$GO_INSTALL_ROOT"
+		display_fatal "Failed to compile. Check the logs at $GVM_ROOT/logs/go-$GO_NAME-compile.log"
+	}
 }
 
 create_enviroment() {
@@ -299,11 +317,29 @@ install_goprotobuf() {
 	fi
 }
 
+# check_bootstrap_toolchain()
+# Go's make.bash needs an existing Go toolchain to build with, found through
+# GOROOT_BOOTSTRAP or, when that is unset, the go on PATH. Neither was checked
+# before the source was cloned and the build started, and the failure then
+# surfaced as make.bash's "Cannot find $HOME/go1.4/bin/go" (issue #27). This
+# runs before download_source, so a machine without Go is told what to do
+# before anything is downloaded.
+check_bootstrap_toolchain() {
+	if [ -n "$GOROOT_BOOTSTRAP" ]; then
+		[ -x "$GOROOT_BOOTSTRAP/bin/go" ] ||
+			display_fatal "GOROOT_BOOTSTRAP is set to '$GOROOT_BOOTSTRAP' but there is no go at '$GOROOT_BOOTSTRAP/bin/go'. Point it at the root of a Go toolchain, or unset it to use the go on PATH."
+	else
+		command -v go &> /dev/null ||
+			display_fatal "Building $VERSION from source needs an existing Go toolchain to bootstrap with, and there is no go on PATH. Install one first with 'gvm install <version> -B' followed by 'gvm use <version>', or set GOROOT_BOOTSTRAP to the root of a Go toolchain, then retry."
+	fi
+}
+
 install_from_source() {
 	# Compiling needs the toolchain that scripts/gvm-check looks for; a binary
 	# install does not, so the check lives here rather than in bin/gvm
 	# (issue #18). It runs before the Go source is cloned.
 	"$GVM_ROOT/scripts/gvm-check" || display_fatal "Missing requirements."
+	check_bootstrap_toolchain
 	download_source
 	check_tag
 	if [[ "$?" == "1" ]]; then
