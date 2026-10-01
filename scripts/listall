@@ -32,10 +32,28 @@ read_command_line "$@"
 echo
 display_message "gvm gos (available)"
 echo
-versions=$(git ls-remote -t https://github.com/golang/go | awk -F/ '{ print $NF }' | $SORT_PATH)
-if [[ $? -ne 0 ]]; then
+# The tags are fetched on their own first. They used to be fetched through a
+# pipeline ending in sort, whose status is the pipeline's, so a failed fetch
+# left $versions empty and the message below never fired; the sort in that
+# pipeline was also dead work, since the list is sorted once more at the end
+# (issue #19).
+tags=$(git ls-remote -t https://github.com/golang/go) ||
 	display_fatal "Failed to get version list from Google"
+versions=$(printf '%s\n' "$tags" | awk -F/ '{ print $NF }')
+
+# A version sort puts go1.9 before go1.10. It goes through $SORT_PATH, the sort
+# that scripts/function/tools located, like every other sort gvm runs. Not
+# every sort understands -V (GNU coreutils before 7.0, some busybox builds):
+# with such a sort first on PATH the whole list went to "sort: invalid
+# option -- V" and only the header was printed (issue #19). The option is
+# probed once on empty input; without it the list is still complete, in
+# plain lexical order.
+if printf '' | $SORT_PATH -V > /dev/null 2>&1; then
+	version_sort() { $SORT_PATH -V; }
+else
+	version_sort() { $SORT_PATH; }
 fi
+
 for version in $versions; do
 	if [[ "$tag_filter" == "release" ]]; then
 		if [[ "${version:0:7}" == "release" ]]; then
@@ -46,6 +64,6 @@ for version in $versions; do
 	else
 		echo "   $version"
 	fi
-done | sort -V
+done | version_sort
 echo
 
