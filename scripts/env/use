@@ -42,6 +42,13 @@ gvm_use() {
     # calling shell; declared inside the loop, zsh would print it on every
     # flush after the first (typeset echoes an already-declared local).
     local i
+    # The index of the accumulator's last element, recomputed on every pass.
+    # It used to be written inline as ${accumulator[${#accumulator[@]}-1]},
+    # which is right for bash but names the element before the last one in
+    # zsh, whose arrays start at 1 (or nothing at all): the `--version <v>`
+    # and `--pkgset <p>` branches below never matched under zsh and the value
+    # fell through to "Unrecognized command line argument" (issue #81).
+    local last
 
     # Go version regex patterns are specifically implemented to output rematches
     # in a consistent format. Consider the following examples:
@@ -96,15 +103,21 @@ gvm_use() {
     do
         [[ "${GVM_DEBUG:-}" -eq 1 ]] && echo "Parsing ${FUNCNAME[0]:-}() argument: ${_option:-[EMPTY]}"
 
+        if [[ -n ${ZSH_VERSION:-} ]]; then
+            last=${#accumulator[@]}
+        else
+            last=$(( ${#accumulator[@]} - 1 ))
+        fi
+
         # if the accumulator has a trailing option flag (that is, the option
         # flag has been specified but no argument has been supplied) then make
         # sure the next _option value is not another option flag.
         # The :- on the index expansions below keeps a shell running under
-        # set -u alive: zsh's arrays start at 1, so this bash-style index
-        # names an element that does not exist there (issue #20).
+        # set -u alive when the accumulator is empty (issue #20); the reads
+        # are guarded so that a negative bash index is never evaluated.
         if [[ $(( ${#accumulator[@]}%2 )) -eq 1 && "${_option}" =~ ^[\-]+ ]]
         then
-            echo "Missing argument for: '${accumulator[${#accumulator[@]}-1]:-}'"
+            echo "Missing argument for: '${accumulator[last]:-}'"
             return 1
         fi
 
@@ -139,7 +152,7 @@ gvm_use() {
             fi
         elif [[ "${version_rematch}" == true ]] &&
                 [[ ${#accumulator[@]} -gt 0 &&
-                    "${accumulator[${#accumulator[@]}-1]:-}" == "--version" ]]
+                    "${accumulator[last]:-}" == "--version" ]]
         then
             # if the regex matches and the accumulator is odd, the previous
             # element in the accumulator must be the option for which this
@@ -151,7 +164,7 @@ gvm_use() {
             accumulator+=( "--pkgset" "${GVM_REMATCH[1]}" )
         elif [[ "${_option}" =~ ^${pkgset_regex}$
             && ${#accumulator[@]} -gt 0
-            && "${accumulator[${#accumulator[@]}-1]:-}" == "--pkgset" ]]
+            && "${accumulator[last]:-}" == "--pkgset" ]]
         then
             accumulator+=( "${GVM_REMATCH[1]}" )
         elif [[ "${_option}" == "--version" ]]

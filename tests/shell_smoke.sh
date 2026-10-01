@@ -100,6 +100,22 @@ gvm use "$version" --quiet
 gvm pkgset create "$pkgset" > /dev/null
 assert_match "gvm pkgset list shows the new pkgset" "$pkgset" "$(gvm pkgset list)"
 
+# the option forms must parse in every shell: the parsers read the last
+# element of their accumulator with a bash-style index, which named the wrong
+# element in zsh's 1-based arrays, and GVM_REMATCH was numbered from the whole
+# match rather than from the first group under zsh (issue #81)
+gvm use --version "$version" --pkgset "$pkgset" --quiet
+assert_equal "gvm use --version <v> --pkgset <p> selects the version" "$version" "$gvm_go_name"
+assert_equal "gvm use --version <v> --pkgset <p> selects the pkgset" "$pkgset" "$gvm_pkgset_name"
+gvm use "$version" "$pkgset" --quiet
+gvm pkgset use --pkgset global --quiet
+assert_equal "gvm pkgset use --pkgset <p> selects the pkgset" "global" "$gvm_pkgset_name"
+gvm use "$version@$pkgset" --quiet
+assert_equal "gvm use <v>@<p> selects the version" "$version" "$gvm_go_name"
+assert_equal "gvm use <v>@<p> selects the pkgset" "$pkgset" "$gvm_pkgset_name"
+gvm use "$version" --quiet
+assert_equal "gvm use <v> returns to the global pkgset" "global" "$gvm_pkgset_name"
+
 # cd must not switch anything in a directory without dot files (issue #1)
 cd "$workdir/plain"
 assert_equal "cd into a plain directory keeps the version" "$version" "$gvm_go_name"
