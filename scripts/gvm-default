@@ -19,10 +19,10 @@ export GVM_PATH_BACKUP="$PATH"
 # scripts/functions loads the function files once per shell (issue #3); clear
 # its guard so that sourcing the integration again picks up the current files.
 __gvm_functions_loaded=""
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 # The default environment is loaded through gvm_source_environment so that
 # the GVM_ROOT recorded in it does not replace the one set above (issue #28).
 [ -f "$GVM_ROOT/environments/default" ] && gvm_source_environment "$GVM_ROOT/environments/default"
-. "$GVM_ROOT/scripts/env/gvm"
+builtin . "$GVM_ROOT/scripts/env/gvm"
 
-. "$GVM_ROOT/scripts/env/cd" && cd .
+builtin . "$GVM_ROOT/scripts/env/cd" && cd .

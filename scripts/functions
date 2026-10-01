@@ -12,6 +12,14 @@ if [[ "${__gvm_functions_loaded:-}" == "$$" ]]; then
 	return 0
 fi
 
+# Every file gvm sources is sourced with `builtin .`, here and in each script,
+# including the two lines the installer writes to scripts/gvm. A plain `.` is
+# subject to alias expansion when a file is sourced into an interactive shell,
+# so a user alias on `.` (an `alias .='echo'` is not unusual) fired on gvm's
+# own lines: scripts/gvm-default was never read and `gvm use` ended in
+# "command not found" (issue #21). `builtin` is a builtin in bash and zsh and
+# costs no fork.
+
 for function in $GVM_ROOT/scripts/function/*; do
 	# function names preceded by an underscore should be loaded by other
 	# scripts explicitly as needed.
@@ -19,7 +27,7 @@ for function in $GVM_ROOT/scripts/function/*; do
 		continue
 	fi
 
-	. "$function"
+	builtin . "$function"
 done
 
 __gvm_functions_loaded="$$"

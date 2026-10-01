@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+builtin . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
 # gvm_pkgset_use()
 # /*!
@@ -187,7 +187,7 @@ gvm_pkgset_use() {
         local local_pkgset="${opt_local}"
 
         if [[ -z "${local_pkgset}" || "${local_pkgset}" == "nil" ]]; then
-            . "$GVM_ROOT/scripts/function/find_local_pkgset"
+            builtin . "$GVM_ROOT/scripts/function/find_local_pkgset"
             local_pkgset=$(find_local_pkgset)
             unset -f find_local_pkgset
         fi
