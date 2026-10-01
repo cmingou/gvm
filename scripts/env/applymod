@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 
 function gvm_applymod(){
 
@@ -8,12 +8,19 @@ function gvm_applymod(){
 		return $(display_error "can not find go.mod")
 	fi
 
-	mod_ver=$(cat go.mod | grep -E 'go [[:digit:]]+.[[:digit:]]+' | tr -d ' ' | tr -d '\n')
-    mod_name=$(cat go.mod | grep 'module ' | tr -d '\n')
+	# This function is sourced into the user's shell, where an alias on a
+	# tool is expanded at parse time: `alias grep='grep --color=always'` put
+	# ANSI escapes into mod_ver and every lookup below failed (issue #21).
+	# The tools are therefore called through the paths scripts/function/tools
+	# located, as every other sourced file does; `cat | grep` and `grep | wc`
+	# are folded into one grep each. GREP_OPTIONS= keeps a colourised BSD
+	# grep out of the result (issue #14).
+	mod_ver=$(GREP_OPTIONS= $GREP_PATH -E 'go [[:digit:]]+.[[:digit:]]+' "$mod_file" | $TR_PATH -d ' ' | $TR_PATH -d '\n')
+	mod_name=$(GREP_OPTIONS= $GREP_PATH 'module ' "$mod_file" | $TR_PATH -d '\n')
 	display_message "$mod_name use go version: $mod_ver"
 
-	if [ $(gvm list | grep $mod_ver | wc -l | tr -d '\n') -lt 1 ]; then
-		if [ $(gvm listall -a| grep $mod_ver | wc -l | tr -d '\n') -lt 1 ]; then
+	if ! gvm list | GREP_OPTIONS= $GREP_PATH -q "$mod_ver"; then
+		if ! gvm listall -a | GREP_OPTIONS= $GREP_PATH -q "$mod_ver"; then
 			return $(display_error "can not find a go version match $mod_ver") 
 		fi
 

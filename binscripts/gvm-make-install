@@ -50,7 +50,7 @@ mkdir -p "$dest/environments" "$dest/gos" "$dest/pkgsets" "$dest/archive" "$dest
 
 # The same two lines the installer writes, for the install location rather
 # than the @prefix@ configure substituted into the checkout's scripts/gvm.
-printf 'export GVM_ROOT=%s\n. $GVM_ROOT/scripts/gvm-default\n' "$root" > "$dest/scripts/gvm"
+printf 'export GVM_ROOT=%s\nbuiltin . $GVM_ROOT/scripts/gvm-default\n' "$root" > "$dest/scripts/gvm"
 
 # An existing Go becomes the "system" version, as in the installer.
 goroot=${GOROOT:-}

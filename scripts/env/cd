@@ -3,8 +3,8 @@
 # Override the cd() function to implement auto-switching of go version and
 # pkgset when changing into a directory.
 
-. "$GVM_ROOT/scripts/functions" || return 1
-. "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+builtin . "$GVM_ROOT/scripts/functions" || return 1
+builtin . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
 # cd may already be an alias: zoxide's `alias cd=z`, an `alias cd='cd -P'`,
 # a plugin's. zsh refuses to define a function whose name is an alias, and

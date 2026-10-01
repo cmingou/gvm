@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 
 # Put the git metadata back into the layout this script found it in. This runs
 # on every exit, so a failure part-way through (bad branch name, network error,

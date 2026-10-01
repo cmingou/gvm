@@ -15,7 +15,7 @@ if [ -z "$GVM_ROOT" ]; then
 	exit 1
 fi
 
-. "$GVM_ROOT/scripts/functions" || exit 1
+builtin . "$GVM_ROOT/scripts/functions" || exit 1
 
 # The subcommand scripts pipe version and pkgset names through grep and use
 # the result as a path. BSD grep (macOS) reads GREP_OPTIONS, so a
@@ -32,7 +32,7 @@ if [[ $command == "implode" ]]; then
 	# not load: only the gvm() shell function sourced it before calling. Run
 	# as a script, the call failed with "command not found" and the
 	# hardcoded exit 0 reported success while nothing happened (issue #32).
-	. "$GVM_ROOT/scripts/env/implode" || exit 1
+	builtin . "$GVM_ROOT/scripts/env/implode" || exit 1
 	gvm_implode
 	exit $?
 fi

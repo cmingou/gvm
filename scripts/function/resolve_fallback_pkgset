@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+builtin . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
 # __gvm_resolve_fallback_pkgset()
 # /*!

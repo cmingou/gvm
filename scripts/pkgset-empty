@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 
 [[ $gvm_pkgset_name != "" ]] ||
 	display_fatal "No Package set selected"

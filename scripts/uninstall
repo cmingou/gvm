@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 
 [[ "$1" == "" ]] &&
 	display_fatal "Please specify the version"

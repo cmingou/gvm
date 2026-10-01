@@ -26,7 +26,7 @@ __gvm_read_environment_file() {
     # file is, which is at every shell startup: nothing on the startup, cd or
     # `gvm use` path uses it any more (issue #2), and gvm itself no longer
     # calls this function.
-    . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
+    builtin . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
 
     if [[ -n ${ZSH_VERSION:-} ]]; then
         setopt KSH_ARRAYS

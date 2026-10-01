@@ -156,7 +156,7 @@ if [ -z "$GVM_NO_UPDATE_PROFILE" ] && [ "$profile_updated" != "0" ]; then
 fi
 
 echo "export GVM_ROOT=$GVM_DEST/$GVM_NAME" > "$GVM_DEST/$GVM_NAME/scripts/gvm"
-echo ". \$GVM_ROOT/scripts/gvm-default" >> "$GVM_DEST/$GVM_NAME/scripts/gvm"
+echo "builtin . \$GVM_ROOT/scripts/gvm-default" >> "$GVM_DEST/$GVM_NAME/scripts/gvm"
 check_existing_go
 [[ -s "$GVM_DEST/$GVM_NAME/scripts/gvm" ]] && source "$GVM_DEST/$GVM_NAME/scripts/gvm"
 echo "Installed GVM v${GVM_VERSION}"

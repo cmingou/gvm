@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-. "$GVM_ROOT/scripts/functions"
+builtin . "$GVM_ROOT/scripts/functions"
 
 function show_usage() {
 	echo "Usage: gvm install [version] [options]"
@@ -132,8 +132,8 @@ create_enviroment() {
 	echo "export LD_LIBRARY_PATH; LD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}\"" >> "$new_env_file"
 	echo "export DYLD_LIBRARY_PATH; DYLD_LIBRARY_PATH=\"\${GVM_OVERLAY_PREFIX}/lib\${DYLD_LIBRARY_PATH:+:\$DYLD_LIBRARY_PATH}\"" >> "$new_env_file"
 	echo "export PKG_CONFIG_PATH; PKG_CONFIG_PATH=\"\${GVM_OVERLAY_PREFIX}/lib/pkgconfig\${PKG_CONFIG_PATH:+:\$PKG_CONFIG_PATH}\"" >> "$new_env_file"
-	. "$GVM_ROOT/scripts/env/use"
-	. "$GVM_ROOT/scripts/env/implode"
+	builtin . "$GVM_ROOT/scripts/env/use"
+	builtin . "$GVM_ROOT/scripts/env/implode"
 	gvm_use "$GO_NAME" &> /dev/null ||
 		display_fatal "Failed to use installed version"
 	gvm pkgset create global
