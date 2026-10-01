@@ -48,10 +48,10 @@ __gvm_callstack() {
 #   pattern match operator in bash: matching results will be written to an array
 #   stored in the var_name provided or 'GVM_REMATCH' (the default).
 #
-# Rematch results can be accessed beginning with index 1: GVM_REMATCH[1] and
-#   subsequent matches (if any) appear in later indexes. The match at index 1
-#   consists of the entire matched string while later matches are related to
-#   specified capture groups noted in the regex pattern.
+# Rematch results are numbered as bash numbers BASH_REMATCH: GVM_REMATCH[1]
+#   is the first capture group of the regex pattern, GVM_REMATCH[2] the second
+#   and so on, in bash and zsh alike. Under bash GVM_REMATCH[0] is the entire
+#   matched string; zsh's arrays start at 1, so there it is not available.
 # @param string The string to match against the regex pattern
 # @param regex The regex pattern
 # @param var_name [optional] The name of the variable into which the resulting
@@ -99,9 +99,19 @@ __gvm_rematch() {
     # support bash and zsh
     #
     # NOTE: 'setopt KSH_ARRAYS' must be set for zsh to force array indexes to
-    # start at 0, like bash.
+    # start at 0, like bash. It is unset again before this function returns,
+    # so a zsh caller reads the result with 1-based indexes. The whole match
+    # (BASH_REMATCH[0]) is therefore left out under zsh, which makes index N
+    # the N-th capture group in both shells. It used to be kept: GVM_REMATCH[1]
+    # was then the whole string under zsh, so `gvm use go1.21.13@extra` looked
+    # for a version called go1.21.13@extra and GVM_REMATCH[5] was the "@extra"
+    # group rather than the pkgset name (issue #81).
     #
-    rematch_ary+=( "${BASH_REMATCH[@]}" )
+    if [[ -n ${ZSH_VERSION:-} ]]; then
+        rematch_ary+=( "${BASH_REMATCH[@]:1}" )
+    else
+        rematch_ary+=( "${BASH_REMATCH[@]}" )
+    fi
 
     if [[ "${var_name}" != "$" ]]; then
         # assign to passed var
