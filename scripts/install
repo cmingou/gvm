@@ -190,17 +190,23 @@ download_binary() {
 		GVM_OS="darwin"
 		osx_major_version="$(sw_vers -productVersion | cut -d "." -f 1)"
 		osx_minor_version="$(sw_vers -productVersion | cut -d "." -f 2)"
-		if [ "${osx_major_version}" -le 10 ]; then
-			if [ "${osx_minor_version}" -ge 8 ]; then
-				GVM_OS_VERSION="-osx10.8"
-			elif [ "${osx_minor_version}" -ge 6 ]; then
-				GVM_OS_VERSION="-osx10.6"
-			else
-				display_error "Binary Go unavailable for this platform"
-				rm -rf $GO_INSTALL_ROOT
-				rm -f $GO_BINARY_PATH
-				return 1
-			fi
+		# The suffix picks the macOS build of the releases before go1.4.3,
+		# which were published as -osx10.6 and -osx10.8 archives only; the
+		# 10.8 build is the one for every later macOS. It used to be assigned
+		# only when the major version was 10, so on macOS 11 and later it
+		# stayed empty and `gvm install go1.4 -B` asked for a URL that does
+		# not exist (issue #26).
+		if [ "${osx_major_version:-0}" -gt 10 ]; then
+			GVM_OS_VERSION="-osx10.8"
+		elif [ "${osx_minor_version:-0}" -ge 8 ]; then
+			GVM_OS_VERSION="-osx10.8"
+		elif [ "${osx_minor_version:-0}" -ge 6 ]; then
+			GVM_OS_VERSION="-osx10.6"
+		else
+			display_error "Binary Go unavailable for this platform"
+			rm -rf $GO_INSTALL_ROOT
+			rm -f $GO_BINARY_PATH
+			return 1
 		fi
 	else
 		GVM_OS="linux"
@@ -221,6 +227,21 @@ download_binary() {
 	fi
 
 	SEMVER=$(extract_version $VERSION)
+
+	# Apple Silicon support arrived with go1.16: no release before it has a
+	# darwin/arm64 archive at any URL, so the download below could only end
+	# in the generic "Failed to download binary go". Say what is wrong and
+	# what to do instead (issue #26). `return 1`, like every other failure
+	# here, so that --prefer-binary still falls back to a source build.
+	if [ "$GVM_OS" = "darwin" ] && [ "$GVM_ARCH" = "arm64" ]; then
+		compare_version $SEMVER "1.16"
+		if [ $? -eq 2 ]; then
+			display_error "No binary of $VERSION exists for darwin/arm64: Go releases before go1.16 were never built for Apple Silicon. Install go1.16 or later instead, e.g. 'gvm install go1.16 -B', and use that as the bootstrap toolchain for a source build of an older release."
+			rm -rf $GO_INSTALL_ROOT
+			return 1
+		fi
+	fi
+
 	compare_version $SEMVER "1.4.3"
 	if [ $? -eq 2 ]; then
 		GO_BINARY_FILE=${VERSION}.${GVM_OS}-${GVM_ARCH}${GVM_OS_VERSION}.tar.gz

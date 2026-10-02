@@ -6,7 +6,7 @@ source $GVM_ROOT/scripts/gvm
 ## that links to everything else on the system; a fake Go version stands in for
 ## an installed one so that no toolchain is needed.
 ## Cleanup test objects
-rm -rf $GVM_ROOT/tmp-check-gate $GVM_ROOT/gos/go0.0.10 $GVM_ROOT/pkgsets/go0.0.10 $GVM_ROOT/environments/go0.0.10 $GVM_ROOT/gos/go0.0.11
+rm -rf $GVM_ROOT/tmp-check-gate $GVM_ROOT/gos/go0.0.10 $GVM_ROOT/pkgsets/go0.0.10 $GVM_ROOT/environments/go0.0.10 $GVM_ROOT/gos/go0.0.11 $GVM_ROOT/gos/go1.99.11
 #######################
 
 mkdir -p $GVM_ROOT/tmp-check-gate/bin $GVM_ROOT/gos/go0.0.10/bin $GVM_ROOT/pkgsets/go0.0.10/global # status=0
@@ -23,8 +23,11 @@ PATH=$GVM_ROOT/tmp-check-gate/bin gvm list # status=0; match=/go0\.0\.10/; match
 PATH=$GVM_ROOT/tmp-check-gate/bin gvm pkgset list # status=0; match=/global/; match!=/Missing requirements/
 
 ## a binary install must not be refused for a missing compiler either: with a
-## dead download URL it fails on the download, off the network, and not before
-PATH=$GVM_ROOT/tmp-check-gate/bin GO_BINARY_BASE_URL=http://127.0.0.1:1 gvm install go0.0.11 -B # status!=0; match=/Failed to download binary/; match!=/Missing requirements/
+## dead download URL it fails on the download, off the network, and not before.
+## The version is one from go1.16 on: on an Apple Silicon Mac an older one is
+## refused before the download, as no darwin/arm64 archive exists (issue #26)
+PATH=$GVM_ROOT/tmp-check-gate/bin GO_BINARY_BASE_URL=http://127.0.0.1:1 gvm install go1.99.11 -B # status!=0; match=/Failed to download binary/; match!=/Missing requirements/
+ls -d $GVM_ROOT/gos/go1.99.11 # status!=0
 
 ## while a build from source must still be refused, before anything is cloned
 PATH=$GVM_ROOT/tmp-check-gate/bin gvm install go0.0.11 # status!=0; match=/Could not find bison/; match=/Missing requirements/
@@ -33,4 +36,4 @@ ls -d $GVM_ROOT/gos/go0.0.11 # status!=0
 ## Cleanup test objects
 cd $GVM_ROOT # status=0
 gvm uninstall go0.0.10 # status=0
-rm -rf $GVM_ROOT/tmp-check-gate $GVM_ROOT/gos/go0.0.10 $GVM_ROOT/pkgsets/go0.0.10 $GVM_ROOT/environments/go0.0.10 $GVM_ROOT/gos/go0.0.11
+rm -rf $GVM_ROOT/tmp-check-gate $GVM_ROOT/gos/go0.0.10 $GVM_ROOT/pkgsets/go0.0.10 $GVM_ROOT/environments/go0.0.10 $GVM_ROOT/gos/go0.0.11 $GVM_ROOT/gos/go1.99.11
