@@ -3,50 +3,71 @@ builtin . "$GVM_ROOT/scripts/functions"
 
 error_message=""
 
+# The install advice used to be the same on every platform: apt-get for
+# everything, "brew install mercurial" when git was missing (left over from
+# the days Go's source lived in Mercurial), and no macOS line at all for
+# binutils, bison, gcc or make (issue #17). The package manager is detected
+# once here, with `command -v` only, and each missing tool gets the command
+# for that manager. On macOS every tool but curl comes with the Xcode Command
+# Line Tools, so that is what is suggested there.
+case "$(uname)" in
+	Darwin)
+		gvm_pkg_manager="xcode"
+		;;
+	*)
+		gvm_pkg_manager=""
+		for candidate in apt-get dnf yum pacman zypper apk; do
+			if command -v "$candidate" &> /dev/null; then
+				gvm_pkg_manager="$candidate"
+				break
+			fi
+		done
+		;;
+esac
+
+# missing_tool <tool> <package> <macos advice>
+# Appends a "Could not find <tool>" paragraph to error_message with the
+# install command for the detected package manager; on macOS the third
+# argument is used instead of a package name. When no package manager was
+# recognised the common ones are listed, as the old message did for apt-get.
+missing_tool() {
+	local tool="$1" package="$2" macos_hint="$3" hint
+	case "$gvm_pkg_manager" in
+		xcode)   hint="  mac:   $macos_hint" ;;
+		apt-get) hint="  linux: apt-get install $package" ;;
+		dnf)     hint="  linux: dnf install $package" ;;
+		yum)     hint="  linux: yum install $package" ;;
+		pacman)  hint="  linux: pacman -S $package" ;;
+		zypper)  hint="  linux: zypper install $package" ;;
+		apk)     hint="  linux: apk add $package" ;;
+		*)       hint="  linux: apt-get install $package  (or dnf, yum, pacman, zypper, apk)
+  mac:   $macos_hint" ;;
+	esac
+	error_message="${error_message}
+Could not find $tool
+
+$hint
+"
+}
+
 # Check for git
 command -v git &> /dev/null ||
-	error_message="${error_message}
-Could not find git
-
-  linux: apt-get install mercurial
-  mac:   brew install mercurial
-"
+	missing_tool git git "xcode-select --install (or: brew install git)"
 # Check for ar
 command -v ar &> /dev/null ||
-	error_message="${error_message}
-Could not find binutils
-
-  linux: apt-get install binutils
-"
+	missing_tool binutils binutils "xcode-select --install"
 # Check for bison
 command -v bison &> /dev/null ||
-	error_message="${error_message}
-Could not find bison
-
-  linux: apt-get install bison
-"
+	missing_tool bison bison "xcode-select --install (or: brew install bison)"
 # Check for gcc
 command -v gcc &> /dev/null ||
-	error_message="${error_message}
-Could not find gcc
-
-  linux: apt-get install gcc
-"
+	missing_tool gcc gcc "xcode-select --install"
 # Check for make
 command -v make &> /dev/null ||
-	error_message="${error_message}
-Could not find make
-
-  linux: apt-get install make
-"
+	missing_tool make make "xcode-select --install"
 # Check for curl
 command -v curl &> /dev/null ||
-	error_message="${error_message}
-Could not find curl
-
-  linux: apt-get install curl
-  mac:   brew install curl
-"
+	missing_tool curl curl "brew install curl"
 
 if [ -n "$error_message" ]; then
 	display_warning "$error_message"
